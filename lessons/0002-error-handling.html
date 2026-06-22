@@ -1,0 +1,144 @@
+<meta charset="utf-8">
+<title>Lesson 2 — Error Handling</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 2 · Build-along</p>
+  <h1>Error handling: from panics to <code>Result</code></h1>
+  <p class="subtitle">Replace the <code>.expect()</code> panics in <code>rwc</code> with real error handling — clean messages on standard error and correct exit codes, the way a command-line tool should behave.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Explain why <code>.expect()</code> is unsuitable for a finished tool.</li>
+    <li>Return a <code>Result</code> from <code>main</code> and propagate errors with the <code>?</code> operator.</li>
+    <li>Convert an <code>Option</code> (a missing argument) into a recoverable error.</li>
+    <li>Produce clean error output on stderr with a non-zero exit code.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0002-rwc/</code>, which already contains the finished tool from <a href="./0001-build-rwc-cli.html">Lesson 1</a>. As before, the lines <span class="add-swatch">highlighted in green</span> are the ones to change.
+  </div>
+
+  <h2>Why <code>.expect()</code> is not enough</h2>
+  <p>The current tool calls <code>.expect()</code>, which <em>panics</em> on failure. Run it against a file that does not exist:</p>
+  <pre class="shell"><code>cargo run -- nope.txt; echo "exit=$?"</code></pre>
+  <pre class="shell"><code>thread 'main' panicked at src/main.rs:7:42:
+could not read file: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+exit=101</code></pre>
+  <p>Three problems for a real tool:</p>
+  <ul>
+    <li>A panic is for <em>unrecoverable bugs</em>, not expected conditions like a missing file.</li>
+    <li>The output mentions internal file/line numbers and a backtrace hint — noise for a user.</li>
+    <li>The exit code is <code>101</code> (Rust's panic code), not the conventional <code>1</code> that scripts and shells expect on failure.</li>
+  </ul>
+
+  <h2>Step 1 — Return a <code>Result</code> from <code>main</code> and propagate with <code>?</code></h2>
+  <p>Apply these five changes to <code>src/main.rs</code>:</p>
+  <pre><code>use std::env;
+use std::fs;
+<span class="add">use std::error::Error;</span>
+
+<span class="add">fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {</span>
+<span class="add">    let path = env::args().nth(1).ok_or("usage: rwc &lt;file&gt;")?;</span>
+<span class="add">    let text = fs::read_to_string(&amp;path)?;</span>
+
+    let lines = text.lines().count();
+    let words = text.split_whitespace().count();
+    let chars = text.chars().count();
+
+    println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
+<span class="add">    Ok(())</span>
+}</code></pre>
+  <p>Here is what each change does, and why it is needed:</p>
+  <ul>
+    <li><strong><code>use std::error::Error;</code></strong> — The standard library defines a trait named <code>Error</code> that every error type implements. This line brings that name into scope so we can refer to it in <code>main</code>'s new return type on the next line; without it we would have to spell out the full path <code>std::error::Error</code> wherever the type appears.</li>
+    <li><strong><code>fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt;</code></strong> — Until now <code>main</code> returned nothing. We change its signature so it returns a <code>Result</code>, which is how any Rust function announces "this might fail." The success variant carries <code>()</code> — the <em>unit type</em>, meaning "no meaningful value," Rust's equivalent of a <code>void</code> return — because when <code>main</code> succeeds it has nothing useful to hand back. The failure variant carries <code>Box&lt;dyn Error&gt;</code>, the catch-all error type explained in the callout below. Crucially, giving <code>main</code> a <code>Result</code> return type is what makes the <code>?</code> operator legal inside it.</li>
+    <li><strong><code>.ok_or("usage: rwc &lt;file&gt;")?</code></strong> — <code>nth(1)</code> hands back an <code>Option</code>, which is <code>None</code> when no argument was supplied. The <code>?</code> operator works on a <code>Result</code>, not an <code>Option</code>, so we convert first: <code>.ok_or(msg)</code> turns <code>Some(path)</code> into <code>Ok(path)</code> and turns <code>None</code> into <code>Err(msg)</code>, using our usage text as the error. The trailing <code>?</code> then either unwraps the path (on <code>Ok</code>) or stops <code>main</code> and returns the error (on <code>Err</code>). Together they replace the old <code>.expect()</code> with a clean usage error instead of a panic.</li>
+    <li><strong><code>fs::read_to_string(&amp;path)?</code></strong> — This is the central change. <code>read_to_string</code> already returns a <code>Result</code>. Appending <code>?</code> means: if the read succeeded, give back the <code>String</code> and continue; if it failed (missing file, no permission), immediately return that error out of <code>main</code>. On success it behaves exactly like the old <code>.expect()</code>; on failure it propagates a recoverable error rather than crashing.</li>
+    <li><strong><code>Ok(())</code></strong> — Because <code>main</code> now promises a <code>Result</code>, every path through it must produce one. Reaching the final line without having returned an error means success, so we hand back <code>Ok(())</code> — the success variant wrapping the unit value. Leave this off and the program will not compile, because <code>main</code> would be declaring a <code>Result</code> it never actually returns.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Concept: the <code>?</code> operator</span>
+    Applied to a <code>Result</code>, <code>?</code> means "if this is <code>Ok(v)</code>, give me <code>v</code>; if it is <code>Err(e)</code>, stop and return <code>Err(e)</code> from the enclosing function." It replaces a verbose <code>match</code>, and it requires the enclosing function to return a compatible <code>Result</code> — which is why <code>main</code>'s signature had to change. (Rust Book, <a href="https://doc.rust-lang.org/book/ch09-02-recoverable-errors-with-result.html">Ch. 9.2</a>.)
+  </div>
+
+  <div class="compare">
+    <span class="label">Concept: <code>Box&lt;dyn Error&gt;</code>, a trait object</span>
+    Different operations fail with different error types (an IO error here, a custom message there). <code>Box&lt;dyn Error&gt;</code> is one return type that accepts <em>any</em> value implementing the <code>Error</code> trait — the concrete type is resolved at runtime. The <code>?</code> operator converts each specific error into it automatically, so <code>main</code> stays simple while individual steps fail in their own ways.
+  </div>
+
+  <h2>Step 2 — Verify the behaviour</h2>
+  <p>Run the three cases and inspect the exit code each time with <code>echo $?</code>:</p>
+  <pre class="shell"><code>cargo run -- ../MISSION.md; echo "exit=$?"   <span class="c"># counts, then exit=0</span>
+cargo run -- nope.txt;      echo "exit=$?"   <span class="c"># error to stderr, exit=1</span>
+cargo run;                  echo "exit=$?"   <span class="c"># usage error, exit=1</span></code></pre>
+  <p>The missing-file run now prints a single clean line to standard error and exits <code>1</code>:</p>
+  <pre class="shell"><code>Error: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+exit=1</code></pre>
+
+  <div class="note">
+    <span class="label">On the message format</span>
+    When <code>main</code> returns an <code>Err</code>, Rust prints it to stderr using its <em>debug</em> representation (hence the <code>Os { … }</code> struct and the quotes around the usage message) and exits with code <code>1</code>. This is correct and scriptable, if a little raw. Producing polished, user-facing messages is the subject of the first two extensions below.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>Add context to the file error.</strong> Include the path in the message using <code>map_err</code>:
+      <pre style="margin-top:0.5rem;"><code>let text = fs::read_to_string(&amp;path).map_err(|e| format!("{path}: {e}"))?;</code></pre>
+      A <code>String</code> converts into <code>Box&lt;dyn Error&gt;</code>, so this compiles and yields a clearer message.</li>
+    <li><strong>Adopt the <code>anyhow</code> crate.</strong> The official CLI guide recommends <code>anyhow</code> for ergonomic error context and cause chains (<code>main() -&gt; anyhow::Result&lt;()&gt;</code> with <code>.with_context(…)</code>). We will add dependencies in Lesson 3. (<a href="https://rust-cli.github.io/book/tutorial/errors.html">CLI Book — Error handling</a>.)</li>
+    <li><strong>Use exit code 2 for usage errors.</strong> Many tools reserve <code>2</code> for incorrect invocation. Match on the argument explicitly and call <code>std::process::exit(2)</code> after printing usage to stderr with <code>eprintln!</code>.</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">Applied to an <code>Err</code>, what does the <code>?</code> operator do?</p>
+    <button class="quiz-opt" data-correct>Returns that error from the function</button>
+    <button class="quiz-opt">Panics and prints a backtrace</button>
+    <button class="quiz-opt">Ignores it and keeps going</button>
+    <p class="quiz-fb ok" hidden>On Err, ? returns early, handing the error back to the caller — here, out of main, where Rust prints it and exits 1.</p>
+    <p class="quiz-fb no" hidden>No: ? returns the Err from the enclosing function (it does not panic or ignore). The caller decides what happens next.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">Why did <code>main</code>'s signature have to change to use <code>?</code>?</p>
+    <button class="quiz-opt" data-correct>So errors can propagate out of main</button>
+    <button class="quiz-opt">Because reading files is always slow</button>
+    <button class="quiz-opt">To allow the file to be mutable</button>
+    <p class="quiz-fb ok" hidden>? returns an Err from the enclosing function, so that function must return a Result — main now returns Result&lt;(), Box&lt;dyn Error&gt;&gt;.</p>
+    <p class="quiz-fb no" hidden>It is about propagation: ? returns an Err from the function, so the function must return a Result. Speed and mutability are unrelated.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">After a handled error returned from <code>main</code>, the exit code is:</p>
+    <button class="quiz-opt" data-correct>One, indicating failure to callers</button>
+    <button class="quiz-opt">Zero, identical to a success</button>
+    <button class="quiz-opt">One hundred one, the panic code</button>
+    <p class="quiz-fb ok" hidden>Returning Err from main exits with code 1 — the conventional failure signal. 101 is reserved for panics, which we replaced.</p>
+    <p class="quiz-fb no" hidden>Returning Err from main exits 1 (failure). 0 means success, and 101 is the panic code we moved away from.</p>
+  </div>
+
+  <h2>Primary source</h2>
+  <p>For the CLI-focused treatment, including the <code>anyhow</code> approach: <a href="https://rust-cli.github.io/book/tutorial/errors.html"><strong>Command Line Applications in Rust — Error handling</strong></a>. For the language mechanics in depth — <code>panic!</code> vs <code>Result</code>, the <code>?</code> operator, and returning <code>Result</code> from <code>main</code> — see the Rust Book, <a href="https://doc.rust-lang.org/book/ch09-00-error-handling.html">Chapter 9</a>.</p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If any of the three runs behaves unexpectedly, paste the output and we will read it together. When the tool reports errors cleanly, the next step is Lesson 3: writing unit and integration tests for <code>rwc</code> with <code>cargo test</code> — locking in its behaviour before we refactor it.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0001-build-rwc-cli.html">◂ Lesson 1: Build a CLI</a>
+      <a href="https://rust-cli.github.io/book/tutorial/errors.html">📘 CLI Book — Errors</a>
+      <a href="./0003-tests.html">Next ▸ Lesson 3: Tests &amp; the feedback loop</a>
+    </div>
+  </div>
+</div>

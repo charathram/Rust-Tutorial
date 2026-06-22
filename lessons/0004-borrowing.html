@@ -1,0 +1,191 @@
+<meta charset="utf-8">
+<title>Lesson 4 — Borrowing &amp; References</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 4 · Build-along</p>
+  <h1>Borrowing &amp; references</h1>
+  <p class="subtitle">Grow <code>rwc</code> to count <em>several</em> files and print a grand total. Passing data around without giving up ownership is what forces the two kinds of reference — shared <code>&amp;</code> and mutable <code>&amp;mut</code> — and the one rule that governs them.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Pass a value to a function by <em>borrowing</em> it (<code>&amp;</code>) instead of moving it, and say why that keeps the caller's ownership intact.</li>
+    <li>Hand out a mutable borrow (<code>&amp;mut</code>) so a function can modify a value in place.</li>
+    <li>State the borrowing rule — <em>either one <code>&amp;mut</code> or any number of <code>&amp;</code>, never both</em> — and explain what it buys versus C and Go.</li>
+    <li>Iterate over a collection by reference so it remains usable afterwards.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0004-rwc/</code>, which already contains the finished, tested tool from <a href="./0003-tests.html">Lesson 3</a>. As before, the lines <span class="add-swatch">highlighted in green</span> are the ones to add or change in each step.
+  </div>
+
+  <h2>Why borrowing, and why now</h2>
+  <p>You have already used a borrow without dwelling on it: <code>counts(&amp;text)</code> hands the counting function a <strong>reference</strong> to the text rather than the text itself, so <code>main</code> keeps ownership and can still use <code>text</code> afterwards. That was the cheap, obvious case. This lesson makes <code>rwc</code> accept <em>several</em> files and print a total across them — and that feature forces the rest of the borrowing model into the open: you will keep a list of paths alive while looping over it, and you will let a helper function <em>modify</em> a running total in place. Each need maps onto a specific kind of reference, and Rust enforces exactly one rule about how they may coexist.</p>
+  <p>A <strong>reference</strong> is Rust's way of letting code use a value <em>without taking ownership of it</em> — no move, no copy, just temporary access that the compiler tracks. Coming from C, a reference is morally a pointer the compiler refuses to let you misuse; coming from Go, it is like passing a pointer except the aliasing rules are checked at compile time instead of trusted at runtime.</p>
+
+  <h2>Step 1 — Accept several file paths</h2>
+  <p>Replace the single-argument handling in <code>main</code> with code that gathers <em>all</em> the path arguments and loops over them:</p>
+  <pre><code>fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+<span class="add">    let paths: Vec&lt;String&gt; = env::args().skip(1).collect();</span>
+<span class="add">    if paths.is_empty() {</span>
+<span class="add">        eprintln!("usage: rwc &lt;file&gt;...");</span>
+<span class="add">        std::process::exit(2);</span>
+<span class="add">    }</span>
+
+<span class="add">    for path in &amp;paths {</span>
+<span class="add">        let text = fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;</span>
+        let (lines, words, chars) = counts(&amp;text);
+        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
+<span class="add">    }</span>
+    Ok(())
+}</code></pre>
+  <p>What each new piece does, and why it is written this way:</p>
+  <ul>
+    <li><strong><code>let paths: Vec&lt;String&gt; = env::args().skip(1).collect();</code></strong> — Three things at once. <code>env::args()</code> yields the command-line arguments as an iterator, and the <em>first</em> item is always the program's own name, so <code>.skip(1)</code> drops it and leaves just the user's file paths. <code>.collect()</code> then drains that iterator into a collection — but <code>collect</code> can build many different collections, so it needs to be told which one; the type annotation <code>: Vec&lt;String&gt;</code> on the left is what tells it. A <code>Vec&lt;String&gt;</code> is a growable, heap-allocated array (a "vector") of owned <code>String</code> values — Rust's equivalent of a dynamic list, and the owner of every path it holds.</li>
+    <li><strong><code>if paths.is_empty() { … std::process::exit(2); }</code></strong> — With multiple files now allowed, "no argument given" is the empty-vector case. <code>is_empty()</code> returns <code>true</code> when there are zero paths; we print usage to stderr and exit with code <code>2</code>, exactly as the single-file version did.</li>
+    <li><strong><code>for path in &amp;paths {</code></strong> — The central borrowing point of this step. The <code>&amp;</code> means we loop over a <em>shared borrow</em> of the vector, so each <code>path</code> is a <code>&amp;String</code> (a reference into <code>paths</code>) and the vector itself is only lent to the loop, not consumed by it. That is why <code>paths</code> is still alive and usable after the loop — we rely on that in Step 2 to ask <code>paths.len()</code>. Had you written <code>for path in paths</code> (no <code>&amp;</code>), the loop would have <em>taken ownership</em> of the vector and consumed it, and <code>paths</code> would no longer exist afterwards.</li>
+    <li><strong><code>fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?</code></strong> — The error message now leads with <em>which</em> file failed (<code>{path}</code>), which matters once several files are in play. The <code>?</code> still bubbles the first failure out of <code>main</code> as before.</li>
+  </ul>
+  <p>The <code>counts(&amp;text)</code> and <code>println!</code> lines are unchanged — they have simply moved inside the loop so they run once per file.</p>
+
+  <h2>Step 2 — Total across files with a <code>&amp;mut</code> accumulator</h2>
+  <p>To print a grand total we need a running tally that each file adds into. Add a small function that takes the total <em>by mutable reference</em> and updates it, then call it inside the loop and print the total at the end:</p>
+  <pre><code>fn counts(text: &amp;str) -&gt; (usize, usize, usize) {
+    <span class="c">// ... unchanged ...</span>
+}
+
+<span class="add">fn add_into(total: &amp;mut (usize, usize, usize), c: (usize, usize, usize)) {</span>
+<span class="add">    total.0 += c.0;</span>
+<span class="add">    total.1 += c.1;</span>
+<span class="add">    total.2 += c.2;</span>
+<span class="add">}</span>
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+    let paths: Vec&lt;String&gt; = env::args().skip(1).collect();
+    if paths.is_empty() {
+        eprintln!("usage: rwc &lt;file&gt;...");
+        std::process::exit(2);
+    }
+
+<span class="add">    let mut total = (0, 0, 0);</span>
+    for path in &amp;paths {
+        let text = fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
+        let (lines, words, chars) = counts(&amp;text);
+        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
+<span class="add">        add_into(&amp;mut total, (lines, words, chars));</span>
+    }
+
+<span class="add">    if paths.len() &gt; 1 {</span>
+<span class="add">        let (lines, words, chars) = total;</span>
+<span class="add">        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} total");</span>
+<span class="add">    }</span>
+    Ok(())
+}</code></pre>
+  <p>The new borrowing ideas here:</p>
+  <ul>
+    <li><strong><code>fn add_into(total: &amp;mut (usize, usize, usize), c: (usize, usize, usize))</code></strong> — The first parameter is a <strong>mutable borrow</strong>: <code>&amp;mut</code> lends the function the totals tuple with permission to <em>read and write</em> it. While that borrow is held, the compiler guarantees nothing else can touch <code>total</code> — the borrow is <em>exclusive</em>. The second parameter, <code>c</code>, is passed <em>by value</em> with no <code>&amp;</code> at all: a tuple of three integers is a <code>Copy</code> type (cheap to duplicate bit-for-bit), so there is nothing to be gained by borrowing it. A <code>String</code> in that position <em>would</em> move, and you would borrow it to avoid that — choosing by-value vs by-reference is a judgement you will make constantly.</li>
+    <li><strong><code>total.0 += c.0;</code></strong> — Tuple fields are reached by position: <code>.0</code>, <code>.1</code>, <code>.2</code>. <code>+=</code> adds in place. Because <code>total</code> arrived as <code>&amp;mut</code>, writing through it actually updates the caller's value.</li>
+    <li><strong><code>let mut total = (0, 0, 0);</code></strong> — The <code>mut</code> keyword marks the binding as mutable; without it the compiler forbids the in-place updates. (Rust bindings are immutable by default — the opposite of C and Go.)</li>
+    <li><strong><code>add_into(&amp;mut total, (lines, words, chars));</code></strong> — The caller must spell out <code>&amp;mut</code> too. Unlike C, where you cannot tell at a call site whether a function will mutate what you pass, Rust makes the exclusive loan <em>visible</em> right there in the call.</li>
+    <li><strong><code>if paths.len() &gt; 1 { … }</code></strong> — Only print a <code>total</code> line when there was more than one file (matching the behaviour of the real <code>wc</code>). This reads <code>paths.len()</code> — which only works because Step 1 iterated with <code>&amp;paths</code> and so left the vector intact.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Concept · the borrowing rule</span>
+    <p>A reference gives temporary access to a value the caller still owns. There are exactly two kinds, and one rule governs how they coexist:</p>
+    <ul>
+      <li><strong><code>&amp;T</code> — a shared (immutable) borrow.</strong> You may have as many of these at once as you like; all of them are read-only.</li>
+      <li><strong><code>&amp;mut T</code> — a mutable (exclusive) borrow.</strong> You may have exactly one, and while it exists <em>no other borrow of that value may exist</em> — not even a shared one.</li>
+    </ul>
+    <p>In one line: <strong>at any moment a value may have either one <code>&amp;mut</code> or any number of <code>&amp;</code>, never both.</strong> (Shared XOR mutable.) A second, quieter rule rides along: a reference may never outlive the data it points to — Rust simply will not compile a dangling reference. Making that second rule explicit in type signatures is the job of <em>lifetimes</em>, which you meet in Lesson 9.</p>
+    <p>This is how Rust eliminates data races and aliasing bugs <em>at compile time</em>, with no garbage collector. In C, nothing stops two mutable pointers to the same object, and the bugs that follow are yours to find. In Go, aliasing is free and a data race is caught — if you are lucky — at runtime by the race detector. Rust pulls that check forward into the compiler: a program that violates shared-XOR-mutable does not build.</p>
+  </div>
+
+  <h2>Step 3 — Run it, and keep the tests green</h2>
+  <p>The running tally has a natural home in the test suite too. Add one test for <code>add_into</code> alongside the existing three:</p>
+  <pre><code>    #[test]
+    fn counts_empty() {
+        <span class="c">// ... unchanged ...</span>
+    }
+
+<span class="add">    #[test]</span>
+<span class="add">    fn add_into_accumulates() {</span>
+<span class="add">        let mut total = (0, 0, 0);</span>
+<span class="add">        add_into(&amp;mut total, (1, 2, 3));</span>
+<span class="add">        add_into(&amp;mut total, (10, 20, 30));</span>
+<span class="add">        assert_eq!(total, (11, 22, 33));</span>
+<span class="add">    }</span></code></pre>
+  <p>Then exercise the tool on more than one file and run the suite:</p>
+  <pre class="shell"><code>cargo run -- ../MISSION.md ../NOTES.md
+cargo test</code></pre>
+  <p>You should see a per-file line for each path plus a <code>total</code> line, and all four tests passing:</p>
+  <pre class="shell"><code>    19    199   1229 ../MISSION.md
+    55   1223   8500 ../NOTES.md
+    74   1422   9729 total
+
+running 4 tests
+test result: ok. 4 passed; 0 failed; 0 ignored; ...</code></pre>
+  <p>(Your exact numbers will differ as the files grow — the point is the <code>total</code> row is the column-wise sum of the others.) The three Lesson 3 tests still pass unchanged: that is the safety net working. The refactor reshaped <code>main</code> substantially, and the tests confirm the counting itself never moved.</p>
+
+  <div class="win">
+    <span class="label">Outcome</span>
+    <code>rwc</code> now counts any number of files and totals them, and you have used both kinds of reference for real: a shared <code>&amp;</code> to read a value without consuming it (<code>&amp;text</code>, <code>&amp;paths</code>) and an exclusive <code>&amp;mut</code> to modify one in place (<code>&amp;mut total</code>). The shared-XOR-mutable rule is the single idea the rest of Rust's safety story is built on.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>Provoke a borrow error (a preview of Lesson 5).</strong> Inside the loop, try to take a second borrow of <code>total</code> while the <code>&amp;mut</code> is conceptually in play — for instance add <code>let peek = &amp;total;</code> on the line <em>before</em> <code>add_into(&amp;mut total, …)</code> and then use <code>peek</code> <em>after</em> the call. Read the <code>E0502</code> error ("cannot borrow <code>total</code> as mutable because it is also borrowed as immutable"). This is the rule from the concept box, enforced. Then remove it.</li>
+    <li><strong>Borrow instead of copy.</strong> Change <code>add_into</code>'s second parameter to <code>c: &amp;(usize, usize, usize)</code> and pass <code>&amp;(lines, words, chars)</code>. It still compiles — reading through a shared borrow is always allowed — and it shows the by-value-vs-by-reference choice is yours, not the compiler's, for a small <code>Copy</code> type.</li>
+    <li><strong>Per-directory guard.</strong> <code>fs::read_to_string</code> fails on a directory. Try <code>cargo run -- .</code> and confirm the per-file error message now names the offending path.</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">While a <code>&amp;mut T</code> borrow of a value is held, what else may borrow that value?</p>
+    <button class="quiz-opt" data-correct>Nothing — a mutable borrow is exclusive</button>
+    <button class="quiz-opt">Any number of shared <code>&amp;</code> borrows</button>
+    <button class="quiz-opt">Exactly one more <code>&amp;mut</code> borrow</button>
+    <p class="quiz-fb ok" hidden>Right — <code>&amp;mut</code> is exclusive: while it exists, no other borrow (shared or mutable) of that value may exist. That is the "mutable" half of shared-XOR-mutable.</p>
+    <p class="quiz-fb no" hidden>A mutable borrow is exclusive. While a <code>&amp;mut</code> is held, no other borrow of that value — shared or mutable — is allowed. Many <code>&amp;</code> borrows are fine only when there is no <code>&amp;mut</code>.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">Why loop with <code>for path in &amp;paths</code> rather than <code>for path in paths</code>?</p>
+    <button class="quiz-opt" data-correct>So <code>paths</code> isn't consumed and is usable after</button>
+    <button class="quiz-opt">Because a <code>Vec</code> cannot be iterated directly</button>
+    <button class="quiz-opt"><code>&amp;paths</code> makes the loop run faster</button>
+    <p class="quiz-fb ok" hidden>Yes — <code>&amp;paths</code> borrows the vector, so the loop only reads it and <code>paths</code> survives. We need that to call <code>paths.len()</code> for the total line afterwards.</p>
+    <p class="quiz-fb no" hidden>It's about ownership, not speed or capability. <code>for path in paths</code> would <em>move</em> the vector into the loop and consume it; <code>&amp;paths</code> borrows it so it's still alive afterwards (we use <code>paths.len()</code>).</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">Why is <code>add_into</code>'s second argument passed by value (<code>c: (usize, usize, usize)</code>) with no <code>&amp;</code>?</p>
+    <button class="quiz-opt" data-correct>A tuple of integers is <code>Copy</code>, so borrowing buys nothing</button>
+    <button class="quiz-opt">Functions cannot take two references at once</button>
+    <button class="quiz-opt">Tuples can only ever be passed by value</button>
+    <p class="quiz-fb ok" hidden>Correct — the tuple is a small <code>Copy</code> type, duplicated cheaply bit-for-bit, so there's no ownership to protect by borrowing. A <code>String</code> there would move, and you'd borrow it instead.</p>
+    <p class="quiz-fb no" hidden>It's a <code>Copy</code> type: a tuple of integers duplicates cheaply, so passing it by value costs nothing and there's no move to avoid. You <em>could</em> borrow it (extension 2) — the choice is yours.</p>
+  </div>
+
+  <h2>Primary source</h2>
+  <p>The canonical treatment, with the same <code>&amp;</code> / <code>&amp;mut</code> distinction and the shared-XOR-mutable rule spelled out: <a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"><strong>The Rust Book, Ch. 4.2 — "References and Borrowing."</strong></a> Chapter 4.1 ("What Is Ownership?") is the move model this builds on, and 4.3 ("The Slice Type") is where <code>&amp;str</code> comes from — both revisited in Lesson 8.</p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If you hit a borrow-checker error you didn't expect — especially from the first optional extension — paste it. Reading those messages well is the entire subject of the next lesson: <strong>Lesson 5 reproduces the real <code>E03xx</code> errors</strong> you meet while pushing <code>rwc</code> further, and decodes what each one is actually telling you.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0003-tests.html">◂ Lesson 3: Tests</a>
+      <a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html">📘 Book Ch. 4.2</a>
+      <span>Next ▸ Lesson 5: Reading borrow-checker errors</span>
+    </div>
+  </div>
+</div>
