@@ -15,7 +15,9 @@
     { n: '1', title: 'Build a CLI: rwc', file: '0001-build-rwc-cli.html' },
     { n: '2', title: 'Error Handling',   file: '0002-error-handling.html' },
     { n: '3', title: 'Tests',            file: '0003-tests.html' },
-    { n: '4', title: 'Borrowing &amp; references', file: '0004-borrowing.html' }
+    { n: '4', title: 'Borrowing &amp; references', file: '0004-borrowing.html' },
+    { n: '5', title: 'Reading borrow-checker errors', file: '0005-borrow-checker-errors.html' },
+    { n: '6', title: 'Structs &amp; enums', file: '0006-structs-enums.html' }
   ];
   var REFS = [
     { title: 'Glossary', href: '../reference/glossary.html' }

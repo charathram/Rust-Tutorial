@@ -15,26 +15,85 @@
   <h1>Glossary</h1>
   <p class="subtitle">The canonical vocabulary for this course. Every lesson uses these terms exactly as defined here. Add to it; don't drift to synonyms.</p>
 
+  <!-- Keep entries in alphabetical order by term (case-insensitive, ignoring a
+       leading "The"; symbol-led terms such as "?" sort first). Add new terms in
+       their correct alphabetical slot, not at the end. -->
   <dl>
     <div class="term">
-      <dt>Ownership</dt>
-      <dd>Rust's compile-time discipline for managing memory: every value has exactly one <em>owner</em>, and when the owner goes out of scope the value is freed. No garbage collector, no manual <code>free</code>. <span class="seen">Orientation</span></dd>
+      <dt>The <code>?</code> operator</dt>
+      <dd>Postfix on a <code>Result</code> (or <code>Option</code>): unwraps <code>Ok(v)</code> to <code>v</code>, or returns <code>Err(e)</code> early from the enclosing function. Requires that function to return a compatible <code>Result</code>/<code>Option</code>. <span class="seen">Lesson 2</span></dd>
     </div>
     <div class="term">
-      <dt>Owner</dt>
-      <dd>The single variable currently responsible for a value. There is only ever one at a time. <span class="seen">Orientation</span></dd>
+      <dt><code>assert_eq!</code> / <code>assert!</code></dt>
+      <dd>Test macros: <code>assert_eq!(a, b)</code> panics (failing the test) unless the values are equal, printing both on failure; <code>assert!(cond, "msg")</code> panics unless <code>cond</code> is true. <span class="seen">Lesson 3</span></dd>
     </div>
     <div class="term">
-      <dt>Move</dt>
-      <dd>What happens on assignment (or passing by value) of a non-<code>Copy</code> type: ownership transfers to the new binding and the old binding becomes <em>invalid</em>. Using it afterward is a compile error (<code>borrow of moved value</code>). The heap data is not duplicated. <span class="seen">Orientation</span></dd>
+      <dt>Borrow <span class="seen">(Lesson 4)</span></dt>
+      <dd>Accessing a value through a reference (<code>&amp;x</code>) without taking ownership, so the owner keeps it. The alternative to moving or cloning.</dd>
+    </div>
+    <div class="term">
+      <dt>Box&lt;dyn Error&gt; (trait object)</dt>
+      <dd>A single type that holds <em>any</em> value implementing the <code>Error</code> trait, with the concrete type resolved at runtime (<code>dyn</code>). Used as a catch-all error type so <code>?</code> can convert many error kinds into one return type. <span class="seen">Lesson 2</span></dd>
+    </div>
+    <div class="term">
+      <dt>Clone</dt>
+      <dd>An <em>explicit</em>, potentially expensive deep copy (<code>x.clone()</code>) that duplicates heap data so both bindings own independent values. Rust never does this implicitly. <span class="seen">Orientation</span></dd>
     </div>
     <div class="term">
       <dt>Copy (trait)</dt>
       <dd>A marker trait for small, fixed-size, stack-only types (integers, <code>bool</code>, <code>char</code>, <code>f64</code>, tuples of such). Assigning a <code>Copy</code> value duplicates it instead of moving it, so the original stays valid. <span class="seen">Orientation</span></dd>
     </div>
     <div class="term">
+      <dt>derive <span class="seen">(Lesson 6)</span></dt>
+      <dd>An attribute, <code>#[derive(...)]</code>, that asks the compiler to generate standard trait implementations automatically — e.g. <code>Debug</code> (the <code>{:?}</code> format), <code>Default</code> (a zero/empty value), <code>Clone</code>/<code>Copy</code>, and <code>PartialEq</code>/<code>Eq</code> (comparison with <code>==</code>).</dd>
+    </div>
+    <div class="term">
+      <dt>Doc-test <span class="seen">(Lesson 6)</span></dt>
+      <dd>A runnable example inside a <code>///</code> doc comment, fenced in triple-backticks. <code>cargo test</code> compiles and runs each one, so documentation can't drift from the code. Collected only for <em>library</em> crates. A leading <code>#</code> hides a line from rendered docs but still runs it; fence words control execution — <code>no_run</code> (compile only), <code>ignore</code> (skip), <code>should_panic</code> (must panic), <code>compile_fail</code> (must not compile).</dd>
+    </div>
+    <div class="term">
       <dt>Drop</dt>
       <dd>The cleanup that runs automatically when an owner goes out of scope (frees heap memory, closes resources). The rough analogue of a C++ destructor; you rarely call it yourself. <span class="seen">Orientation</span></dd>
+    </div>
+    <div class="term">
+      <dt>enum <span class="seen">(Lesson 6)</span></dt>
+      <dd>A custom type that is exactly <em>one of</em> a fixed set of <em>variants</em> (a "sum type" / tagged union), and a variant may carry data — e.g. <code>Source::Stdin</code> or <code>Source::File(String)</code>. The compiler tracks which variant is active; you read it back with <code>match</code>. <code>Option</code> and <code>Result</code> are standard-library enums.</dd>
+    </div>
+    <div class="term">
+      <dt>Library crate vs binary crate <span class="seen">(Lesson 6)</span></dt>
+      <dd><code>src/main.rs</code> is a <em>binary</em> crate (produces an executable); <code>src/lib.rs</code> is a <em>library</em> crate (reusable code, imported by package name, e.g. <code>use rwc::Counts</code>). A package can hold both, with the binary depending on the library.</dd>
+    </div>
+    <div class="term">
+      <dt>Move</dt>
+      <dd>What happens on assignment (or passing by value) of a non-<code>Copy</code> type: ownership transfers to the new binding and the old binding becomes <em>invalid</em>. Using it afterward is a compile error (<code>borrow of moved value</code>). The heap data is not duplicated. <span class="seen">Orientation</span></dd>
+    </div>
+    <div class="term">
+      <dt>Option&lt;T&gt;</dt>
+      <dd>An enum for a value that may be absent: <code>Some(value)</code> or <code>None</code>. Rust's replacement for null — the compiler forces you to handle the <code>None</code> case before using the value. <span class="seen">Lesson 1</span></dd>
+    </div>
+    <div class="term">
+      <dt>Owner</dt>
+      <dd>The single variable currently responsible for a value. There is only ever one at a time. <span class="seen">Orientation</span></dd>
+    </div>
+    <div class="term">
+      <dt>Ownership</dt>
+      <dd>Rust's compile-time discipline for managing memory: every value has exactly one <em>owner</em>, and when the owner goes out of scope the value is freed. No garbage collector, no manual <code>free</code>. <span class="seen">Orientation</span></dd>
+    </div>
+    <div class="term">
+      <dt>panic</dt>
+      <dd>An unrecoverable abort for bugs/impossible states. Unwinds the stack, prints a message and backtrace hint to stderr, and exits with code <code>101</code>. Triggered by <code>panic!</code>, <code>.unwrap()</code>, <code>.expect()</code>. Prefer <code>Result</code> for expected failures. <span class="seen">Lesson 2</span></dd>
+    </div>
+    <div class="term">
+      <dt>Pure function</dt>
+      <dd>A function whose output depends only on its inputs, with no I/O or side effects (e.g. <code>rwc</code>'s <code>counts(&amp;str)</code>). Trivial to test: pass input, assert on the return value. <span class="seen">Lesson 3</span></dd>
+    </div>
+    <div class="term">
+      <dt>Reference: <code>&amp;T</code> / <code>&amp;mut T</code> <span class="seen">(Lesson 4)</span></dt>
+      <dd>Temporary access to a value the caller still owns. <code>&amp;T</code> is a <em>shared</em> (read-only) borrow — you may have any number at once; <code>&amp;mut T</code> is a <em>mutable</em> (exclusive) borrow — at most one, and no other borrow may coexist with it. The rule, enforced at compile time: <strong>either one <code>&amp;mut</code> or any number of <code>&amp;</code>, never both</strong> ("shared XOR mutable"). A reference may never outlive the data it points to.</dd>
+    </div>
+    <div class="term">
+      <dt>Result&lt;T, E&gt;</dt>
+      <dd>An enum for an operation that may fail: <code>Ok(value)</code> or <code>Err(error)</code>. Returned by anything fallible (e.g. file IO). The error must be acknowledged before the success value can be used. <span class="seen">Lesson 1, 2</span></dd>
     </div>
     <div class="term">
       <dt>Scope</dt>
@@ -45,52 +104,24 @@
       <dd>Stack: fast, fixed-size, LIFO storage for values whose size is known at compile time. Heap: storage for data of size unknown or variable at compile time (e.g. a growable <code>String</code>), reached via a pointer held on the stack. <span class="seen">Orientation</span></dd>
     </div>
     <div class="term">
-      <dt>Clone</dt>
-      <dd>An <em>explicit</em>, potentially expensive deep copy (<code>x.clone()</code>) that duplicates heap data so both bindings own independent values. Rust never does this implicitly. <span class="seen">Orientation</span></dd>
+      <dt>String vs &amp;str <span class="seen">(preview — Module 2)</span></dt>
+      <dd><code>String</code> is an owned, growable, heap-allocated UTF-8 string; <code>&amp;str</code> is a borrowed view (slice) into UTF-8 text. Detailed in a later lesson.</dd>
     </div>
     <div class="term">
-      <dt>Option&lt;T&gt;</dt>
-      <dd>An enum for a value that may be absent: <code>Some(value)</code> or <code>None</code>. Rust's replacement for null — the compiler forces you to handle the <code>None</code> case before using the value. <span class="seen">Lesson 1</span></dd>
+      <dt>struct <span class="seen">(Lesson 6)</span></dt>
+      <dd>A custom type bundling named fields held <em>together</em> (a "product type") — e.g. <code>Counts { lines, words, chars }</code>. Fields and the type carry <code>pub</code> visibility independently; methods and associated functions live in an <code>impl</code> block. The named fields replace positional tuple access (<code>.0</code>/<code>.1</code>).</dd>
     </div>
     <div class="term">
-      <dt>Result&lt;T, E&gt;</dt>
-      <dd>An enum for an operation that may fail: <code>Ok(value)</code> or <code>Err(error)</code>. Returned by anything fallible (e.g. file IO). The error must be acknowledged before the success value can be used. <span class="seen">Lesson 1, 2</span></dd>
+      <dt>Trait <span class="seen">(seen: Orientation, Lessons 2 &amp; 6 — full treatment Module 4)</span></dt>
+      <dd>A named set of methods a type can promise to provide — Rust's mechanism for <em>shared behaviour</em>, close to an interface (Go/Java) or an abstract base class (C++). A type opts in with <code>impl Trait for Type</code>; code can then accept "any type that implements <code>Trait</code>" without naming the concrete type. Traits power <code>#[derive(...)]</code> (<code>Copy</code>, <code>Default</code>, <code>Debug</code>, <code>PartialEq</code> are all traits), are required in scope to call their methods (e.g. <code>Read</code> for <code>read_to_string</code>), and underpin both <em>static dispatch</em> (generics with trait bounds, resolved at compile time) and <em>dynamic dispatch</em> (trait objects like <code>Box&lt;dyn Error&gt;</code>, resolved at runtime).</dd>
     </div>
     <div class="term">
-      <dt>The <code>?</code> operator</dt>
-      <dd>Postfix on a <code>Result</code> (or <code>Option</code>): unwraps <code>Ok(v)</code> to <code>v</code>, or returns <code>Err(e)</code> early from the enclosing function. Requires that function to return a compatible <code>Result</code>/<code>Option</code>. <span class="seen">Lesson 2</span></dd>
-    </div>
-    <div class="term">
-      <dt>panic</dt>
-      <dd>An unrecoverable abort for bugs/impossible states. Unwinds the stack, prints a message and backtrace hint to stderr, and exits with code <code>101</code>. Triggered by <code>panic!</code>, <code>.unwrap()</code>, <code>.expect()</code>. Prefer <code>Result</code> for expected failures. <span class="seen">Lesson 2</span></dd>
-    </div>
-    <div class="term">
-      <dt>Box&lt;dyn Error&gt; (trait object)</dt>
-      <dd>A single type that holds <em>any</em> value implementing the <code>Error</code> trait, with the concrete type resolved at runtime (<code>dyn</code>). Used as a catch-all error type so <code>?</code> can convert many error kinds into one return type. <span class="seen">Lesson 2</span></dd>
+      <dt>Type</dt>
+      <dd>A classification of values that, in Rust, encodes three things: the value's <em>shape</em> (layout and operations — primitives, tuples, <code>struct</code>s, <code>enum</code>s); its <em>ownership behaviour</em> (whether it <em>moves</em> or is <code>Copy</code> on assignment is a property of the type); and its <em>capabilities</em> (the set of traits it implements — e.g. a type is comparable with <code>==</code> only if it implements <code>PartialEq</code>). Rust is statically and strongly typed: every value has a type, usually <em>inferred</em> (annotate when ambiguous, e.g. <code>let paths: Vec&lt;String&gt; = …</code>), and checked before the program runs with no implicit coercions. The type system is where the safety guarantees live — absence is the type <code>Option&lt;T&gt;</code>, failure is <code>Result&lt;T, E&gt;</code>, and <code>&amp;T</code> vs <code>&amp;mut T</code> are distinct types with different rules. <span class="seen">Orientation</span></dd>
     </div>
     <div class="term">
       <dt>Unit test (<code>#[test]</code> / <code>#[cfg(test)]</code>)</dt>
       <dd>A function marked <code>#[test]</code>, usually inside a <code>#[cfg(test)] mod tests</code> module that is compiled only when running tests. <code>cargo test</code> runs every such function and reports pass/fail. <span class="seen">Lesson 3</span></dd>
-    </div>
-    <div class="term">
-      <dt><code>assert_eq!</code> / <code>assert!</code></dt>
-      <dd>Test macros: <code>assert_eq!(a, b)</code> panics (failing the test) unless the values are equal, printing both on failure; <code>assert!(cond, "msg")</code> panics unless <code>cond</code> is true. <span class="seen">Lesson 3</span></dd>
-    </div>
-    <div class="term">
-      <dt>Pure function</dt>
-      <dd>A function whose output depends only on its inputs, with no I/O or side effects (e.g. <code>rwc</code>'s <code>counts(&amp;str)</code>). Trivial to test: pass input, assert on the return value. <span class="seen">Lesson 3</span></dd>
-    </div>
-    <div class="term">
-      <dt>Borrow <span class="seen">(Lesson 4)</span></dt>
-      <dd>Accessing a value through a reference (<code>&amp;x</code>) without taking ownership, so the owner keeps it. The alternative to moving or cloning.</dd>
-    </div>
-    <div class="term">
-      <dt>Reference: <code>&amp;T</code> / <code>&amp;mut T</code> <span class="seen">(Lesson 4)</span></dt>
-      <dd>Temporary access to a value the caller still owns. <code>&amp;T</code> is a <em>shared</em> (read-only) borrow — you may have any number at once; <code>&amp;mut T</code> is a <em>mutable</em> (exclusive) borrow — at most one, and no other borrow may coexist with it. The rule, enforced at compile time: <strong>either one <code>&amp;mut</code> or any number of <code>&amp;</code>, never both</strong> ("shared XOR mutable"). A reference may never outlive the data it points to.</dd>
-    </div>
-    <div class="term">
-      <dt>String vs &amp;str <span class="seen">(preview — Module 2)</span></dt>
-      <dd><code>String</code> is an owned, growable, heap-allocated UTF-8 string; <code>&amp;str</code> is a borrowed view (slice) into UTF-8 text. Detailed in a later lesson.</dd>
     </div>
   </dl>
 

@@ -155,10 +155,10 @@
       <li>Choose <code>&amp;str</code> vs <code>String</code> deliberately, and read/write basic lifetime annotations.</li>
     </ul>
     <ul class="lessons">
-      <li><span class="lnum">04</span><div><div class="ltitle"><a href="./0004-borrowing.html">Borrowing &amp; references</a><span class="ef">M</span><span class="st next">Next</span></div><div class="ldesc">Anchor: <code>rwc</code> grows to count several files and total them — shared <code>&amp;</code>, mutable <code>&amp;mut</code>, and the shared-XOR-mutable rule, with the Lesson 3 tests as the safety net.</div></div></li>
-      <li><span class="lnum">05</span><div><div class="ltitle">Reading borrow-checker errors<span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: the real <code>E03xx</code> errors hit while making <code>rwc</code> accept <em>several</em> file paths from <code>args</code>; what each means and its standard fix.</div></div></li>
-      <li><span class="lnum">06</span><div><div class="ltitle">Structs &amp; enums<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: a <code>Counts</code> struct to total across files, and a <code>Source</code> enum for <em>file vs stdin</em> input.</div></div></li>
-      <li><span class="lnum">07</span><div><div class="ltitle">Pattern matching with <code>match</code><span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: dispatch on the <code>Source</code> enum to read a file or standard input; exhaustiveness as a compiler guarantee.</div></div></li>
+      <li><span class="lnum">04</span><div><div class="ltitle"><a href="./0004-borrowing.html">Borrowing &amp; references</a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: <code>rwc</code> grows to count several files and total them — shared <code>&amp;</code>, mutable <code>&amp;mut</code>, and the shared-XOR-mutable rule, with the Lesson 3 tests as the safety net.</div></div></li>
+      <li><span class="lnum">05</span><div><div class="ltitle"><a href="./0005-borrow-checker-errors.html">Reading borrow-checker errors</a><span class="ef">S</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: deliberately provoke the four classic <code>E03xx</code> errors in <code>rwc</code> (<code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code>); read each message structurally and apply its standard fix.</div></div></li>
+      <li><span class="lnum">06</span><div><div class="ltitle"><a href="./0006-structs-enums.html">Structs &amp; enums</a><span class="ef">M</span><span class="st next">Next</span></div><div class="ldesc">Anchor: a <code>Counts</code> struct replacing the <code>(usize, usize, usize)</code> tuple, and a <code>Source</code> enum for <em>file vs stdin</em> input. First lesson with <code>src/lib.rs</code>, so doc-tests land here.</div></div></li>
+      <li><span class="lnum">07</span><div><div class="ltitle">Pattern matching with <code>match</code><span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: the <code>Source</code> enum's <code>match</code> revisited in depth — exhaustiveness as a compile-time guarantee (add a variant, watch every <code>match</code> demand it), plus guards, bindings, and <code>if let</code>/<code>let else</code>.</div></div></li>
       <li><span class="lnum">08</span><div><div class="ltitle">Strings &amp; slices: <code>String</code> vs <code>&amp;str</code><span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: the counting functions take <code>&amp;str</code>; slicing and UTF-8 boundaries.</div></div></li>
       <li><span class="lnum">09</span><div><div class="ltitle">Lifetimes: borrowed data in types<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: a struct that holds a <code>&amp;str</code> (e.g. a per-file <code>Report&lt;'a&gt;</code>) is exactly where <code>'a</code> first becomes necessary; the elision rules and <code>'static</code>. Advanced cases revisited under async (Module 6).</div></div></li>
     </ul>
@@ -337,7 +337,7 @@
     <div class="nav-links">
       <a href="../reference/glossary.html">📖 Glossary</a>
       <a href="./0000-ownership-and-moves.html">Start ▸ Orientation</a>
-      <a href="./0004-borrowing.html">Current ▸ Lesson 4</a>
+      <a href="./0006-structs-enums.html">Current ▸ Lesson 6</a>
     </div>
   </div>
 </div>

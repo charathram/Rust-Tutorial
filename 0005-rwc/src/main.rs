@@ -1,6 +1,7 @@
-// Starting point for Lesson 4: the finished rwc from Lesson 3 (tests).
-// You will grow it to count several files and print a grand total —
-// meeting shared (&) and mutable (&mut) borrows as the feature demands them.
+// Starting point for Lesson 5: the finished rwc from Lesson 4 (borrowing).
+// It counts several files and prints a grand total. In this lesson you will
+// deliberately break it to provoke real borrow-checker errors (E03xx),
+// learn to read each one, and apply the standard fix.
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -27,8 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut total = (0, 0, 0);
     for path in &paths {
-        let text = fs::read_to_string(&path)
-            .map_err(|e| format!("could not read file {}: {}", path, e))?;
+        let text =
+            fs::read_to_string(path).map_err(|e| format!("could not read file {}: {}", path, e))?;
         let (lines, words, chars) = counts(&text);
         println!("{lines:>6} {words:>6} {chars:>6} {path}");
         add_into(&mut total, (lines, words, chars));
