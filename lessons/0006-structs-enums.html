@@ -1,0 +1,427 @@
+<meta charset="utf-8">
+<title>Lesson 6 — Structs &amp; Enums</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 6 · Build-along</p>
+  <h1>Structs &amp; enums</h1>
+  <p class="subtitle">Give <code>rwc</code>'s data real names. The anonymous <code>(usize, usize, usize)</code> tuple becomes a <code>Counts</code> struct, input gains a <code>Source</code> enum so <code>rwc</code> can read standard input — and, because the logic moves into a <em>library</em> crate, your examples can be runnable <strong>doc-tests</strong>.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Define a <code>struct</code> with named fields and give it methods in an <code>impl</code> block.</li>
+    <li>Use <code>#[derive(...)]</code> to get <code>Debug</code>, <code>Default</code>, <code>Clone</code>/<code>Copy</code>, and equality for free.</li>
+    <li>Model "one of several shapes" with an <code>enum</code> whose variants carry data, and read a variant back out with <code>match</code>.</li>
+    <li>Split a crate into a <em>library</em> (<code>src/lib.rs</code>) and a thin <em>binary</em> (<code>src/main.rs</code>) that uses it.</li>
+    <li>Write <strong>doc-tests</strong> — runnable examples in <code>///</code> comments — and control them with hidden <code>#</code> lines and fence annotations (<code>no_run</code>, <code>ignore</code>, <code>should_panic</code>, <code>compile_fail</code>).</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0006-rwc/</code>, a clean copy of the finished tool from <a href="./0005-borrow-checker-errors.html">Lesson 5</a> (multi-file counting with a grand total, four green tests). As before, the lines <span class="add-swatch">highlighted in green</span> are the ones to add or change in each step. Brand-new files are shown in full without highlighting. Code left as <code class="todo">// TODO (your turn)</code> is yours to write — attempt it, then open <em>Show solution</em> to check.
+  </div>
+
+  <h2>Why structs and enums, and why now</h2>
+  <p>Through Lesson 5 the counts were a bare tuple, <code>(usize, usize, usize)</code>. It worked, but every use site had to <em>remember</em> that <code>.0</code> is lines, <code>.1</code> is words, and <code>.2</code> is characters — nothing in the code said so. A <strong>struct</strong> fixes that: it gives the three numbers names, so you write <code>c.lines</code> instead of <code>c.0</code>, and it can carry its own methods. An <strong>enum</strong> lets you say that input is <em>either</em> standard input <em>or</em> a named file and nothing else, which is what lets <code>rwc</code> read piped input the way real <code>wc</code> does.</p>
+  <p>Coming from C, a <code>struct</code> is the familiar record — but Rust's also owns its fields and can have methods. The <code>enum</code> goes further: it is a <em>tagged union</em> (a "sum type") where the compiler tracks which variant is active and a variant can hold data. C unions give you the overlapping storage but not the safety; Go has no direct equivalent and reaches for an interface or a spare boolean. Putting this logic into a library crate is also what makes <strong>doc-tests</strong> possible, the testing feature mentioned back in Lesson 3.</p>
+
+  <h2>Step 1 — Start a library with a <code>Counts</code> struct</h2>
+  <p>Until now everything lived in <code>src/main.rs</code>. Create a second file, <code>src/lib.rs</code> — cargo automatically treats it as a <em>library crate</em> named after the package (<code>rwc</code>). Put the counting logic there, built around a new <code>Counts</code> struct. Here is the file — <code>from_text</code> is written out as your model, and the second method, <code>add</code>, is left for you to fill in:</p>
+  <pre><code>#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Counts {
+    pub lines: usize,
+    pub words: usize,
+    pub chars: usize,
+}
+
+impl Counts {
+    pub fn from_text(text: &amp;str) -&gt; Counts {
+        Counts {
+            lines: text.lines().count(),
+            words: text.split_whitespace().count(),
+            chars: text.chars().count(),
+        }
+    }
+
+    pub fn add(&amp;mut self, other: Counts) {
+        <span class="todo">// TODO (your turn): add each field of other into self</span>
+    }
+}</code></pre>
+  <p><strong>Your turn</strong> — implement <code>add</code>. It is the method form of Lesson 4's <code>add_into</code>: add each field of <code>other</code> onto <code>self</code> in place. The <code>&amp;mut self</code> receiver is what lets you write back into the caller's value.</p>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn add(&amp;mut self, other: Counts) {
+        self.lines += other.lines;
+        self.words += other.words;
+        self.chars += other.chars;
+    }</code></pre>
+  </details>
+  <p>Every piece, explained:</p>
+  <ul>
+    <li><strong><code>pub struct Counts { pub lines: usize, ... }</code></strong> — A <code>struct</code> defines a new type made of named fields. <code>Counts</code> bundles the three tallies into one value where <code>c.lines</code> says what <code>c.0</code> never could. <code>pub</code> on the struct makes the type visible outside the library; <code>pub</code> on each field makes that field readable and writable from outside too (without it, the fields would be private to the library — fine for many designs, but here the binary needs to read them to print).</li>
+    <li><strong><code>#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]</code></strong> — An <em>attribute</em> that asks the compiler to generate standard trait implementations so you don't write them by hand. <code>Debug</code> enables <code>{:?}</code> formatting (handy in tests and <code>dbg!</code>); <code>Default</code> gives <code>Counts::default()</code> — every field set to its own default, i.e. <code>0</code> — which is our zero-initialised total; <code>Clone</code> + <code>Copy</code> make <code>Counts</code> behave like the tuple did (cheap bit-for-bit duplication, no moves to worry about, because it is just three integers); <code>PartialEq</code> + <code>Eq</code> let you compare two <code>Counts</code> with <code>==</code> and use <code>assert_eq!</code> on them.</li>
+    <li><strong><code>impl Counts { ... }</code></strong> — An <em>implementation block</em>: where a type's methods and associated functions live. Everything inside is attached to <code>Counts</code>.</li>
+    <li><strong><code>pub fn from_text(text: &amp;str) -&gt; Counts</code></strong> — An <em>associated function</em> (no <code>self</code> parameter), called as <code>Counts::from_text(...)</code>. It is the old <code>counts()</code> function, now returning a named <code>Counts</code> by writing each field. The struct-literal syntax <code>Counts { lines: ..., words: ..., chars: ... }</code> constructs a value by naming every field.</li>
+    <li><strong><code>pub fn add(&amp;mut self, other: Counts)</code></strong> — A <em>method</em>: the <code>&amp;mut self</code> first parameter means it borrows the receiver mutably, so <code>total.add(c)</code> updates <code>total</code> in place. This replaces the free-standing <code>add_into(&amp;mut total, c)</code> from Lesson 4 — same mutable-borrow idea, now written as <code>total.add(c)</code>, which reads better and keeps the behaviour next to the data. <code>self</code> is just Rust's <code>this</code>; <code>&amp;mut self</code> is shorthand for <code>self: &amp;mut Counts</code>.</li>
+  </ul>
+  <p>The binary won't compile against this yet — we rewire <code>main</code> in Step 3. First, the input side.</p>
+
+  <h2>Step 2 — Model the input with a <code>Source</code> enum</h2>
+  <p>So far <code>rwc</code> only reads files. Real <code>wc</code> also reads <em>standard input</em> when given no arguments (so you can pipe into it: <code>cat file | wc</code>). "A file path, or standard input" is a textbook case for an <strong>enum</strong> — a value that is exactly one of a fixed set of shapes. Add a <code>Source</code> enum below <code>Counts</code>, plus the two imports it needs at the top of the file — here is <code>src/lib.rs</code> now, with the new lines highlighted:</p>
+  <pre><code><span class="add">use std::fs;</span>
+<span class="add">use std::io::{self, Read};</span>
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Counts {
+    <span class="c">// ... unchanged ...</span>
+}
+
+impl Counts {
+    <span class="c">// ... unchanged ...</span>
+}
+
+<span class="add">pub enum Source {</span>
+<span class="add">    Stdin,</span>
+<span class="add">    File(String),</span>
+<span class="add">}</span>
+
+<span class="add">impl Source {</span>
+<span class="add">    pub fn from_args(args: Vec&lt;String&gt;) -&gt; Vec&lt;Source&gt; {</span>
+<span class="add">        if args.is_empty() {</span>
+<span class="add">            vec![Source::Stdin]</span>
+<span class="add">        } else {</span>
+<span class="add">            args.into_iter().map(Source::File).collect()</span>
+<span class="add">        }</span>
+<span class="add">    }</span>
+
+<span class="add">    pub fn name(&amp;self) -&gt; &amp;str {</span>
+<span class="add">        match self {</span>
+<span class="add">            Source::Stdin =&gt; "-",</span>
+<span class="add">            Source::File(path) =&gt; path,</span>
+<span class="add">        }</span>
+<span class="add">    }</span>
+
+<span class="add">    pub fn read(&amp;self) -&gt; io::Result&lt;String&gt; {</span>
+<span class="add">        <span class="todo">// TODO (your turn): match self — Stdin reads io::stdin() into a</span></span>
+<span class="add">        <span class="todo">// String; File(path) uses fs::read_to_string(path). Let ? bubble.</span></span>
+<span class="add">    }</span>
+<span class="add">}</span></code></pre>
+  <p><strong>Your turn</strong> — implement <code>read</code>. It has the same <code>match</code> shape as <code>name</code> just above: for <code>Source::File(path)</code> reuse <code>fs::read_to_string</code> from Lesson 2; for <code>Source::Stdin</code> read <code>io::stdin()</code> into a <code>String</code> with <code>read_to_string</code>, letting <code>?</code> bubble any error.</p>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn read(&amp;self) -&gt; io::Result&lt;String&gt; {
+        match self {
+            Source::Stdin =&gt; {
+                let mut buf = String::new();
+                io::stdin().read_to_string(&amp;mut buf)?;
+                Ok(buf)
+            }
+            Source::File(path) =&gt; fs::read_to_string(path),
+        }
+    }</code></pre>
+  </details>
+  <p>What is new here:</p>
+  <ul>
+    <li><strong><code>pub enum Source { Stdin, File(String) }</code></strong> — An <code>enum</code> declares a type with a fixed list of <em>variants</em>. A <code>Source</code> is <em>either</em> <code>Stdin</code> (a plain variant, no data) <em>or</em> <code>File(String)</code> (a variant that <em>carries</em> a <code>String</code>, the path). Crucially it can only ever be one of them — the compiler stores a hidden tag and won't let you read the path out of a <code>Stdin</code>. This is the "sum type" idea: unlike a struct, which holds <em>all</em> its fields at once, an enum holds exactly one variant at a time.</li>
+    <li><strong><code>use std::fs;</code> and <code>use std::io::{self, Read};</code></strong> — Imports. <code>io::{self, Read}</code> brings in both the <code>io</code> module itself (so we can write <code>io::stdin()</code> and <code>io::Result</code>) and the <code>Read</code> <em>trait</em>; the trait must be in scope for its <code>.read_to_string()</code> method to be callable on stdin. (Traits get their own lessons in Module 4; for now just know a method can come from a trait you have to import.)</li>
+    <li><strong><code>from_args</code></strong> — Turns the argument list into a <code>Vec&lt;Source&gt;</code>. No arguments ⇒ a single <code>Source::Stdin</code>, matching <code>wc</code>'s behaviour. Otherwise each path string becomes a <code>Source::File</code>. The expression <code>.map(Source::File)</code> uses a tuple-variant's name <em>as a function</em>: <code>Source::File</code> is, in effect, a function <code>String -&gt; Source</code>, so mapping it over the paths wraps each one. (Writing <code>.map(|p| Source::File(p))</code> means the same thing; <code>clippy</code> will nudge you to the shorter form.)</li>
+    <li><strong><code>name(&amp;self) -&gt; &amp;str</code></strong> — A method taking <code>&amp;self</code> (a <em>shared</em> borrow — it only reads). It returns the label for the output column. The <code>match</code> inspects which variant <code>self</code> is; for <code>File(path)</code> it <em>binds</em> the inner string to <code>path</code> and returns it. <code>match</code> is Rust's version of <code>switch</code>, with more capability (exhaustiveness checking, richer patterns); <strong>Lesson 7 covers it in full</strong>. Here it is simply the way to ask an enum "which variant are you, and what's inside?".</li>
+    <li><strong><code>read(&amp;self) -&gt; io::Result&lt;String&gt;</code></strong> — Reads the whole source into a <code>String</code>. For <code>Stdin</code> it reads from <code>io::stdin()</code> into a buffer (the <code>?</code> bubbles up any IO error, exactly as in Lesson 2); for <code>File(path)</code> it calls the same <code>fs::read_to_string</code> you already know. Both arms produce an <code>io::Result&lt;String&gt;</code>, so the whole <code>match</code> does.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Concept · struct vs enum</span>
+    <p>Both define new types; the difference is "and" versus "or":</p>
+    <ul>
+      <li>A <strong><code>struct</code></strong> is a record of fields held <em>together</em> — a <code>Counts</code> has lines <strong>and</strong> words <strong>and</strong> chars, all at once. (A "product type".)</li>
+      <li>An <strong><code>enum</code></strong> is a choice between variants held <em>one at a time</em> — a <code>Source</code> is <code>Stdin</code> <strong>or</strong> <code>File</code>, never both. (A "sum type".) Variants may carry their own data of different shapes.</li>
+    </ul>
+    <p>You have already been using enums: <code>Option&lt;T&gt;</code> (<code>Some</code>/<code>None</code>) and <code>Result&lt;T, E&gt;</code> (<code>Ok</code>/<code>Err</code>) are both enums from the standard library. Defining <code>Source</code> is the same machinery, now in your own code.</p>
+  </div>
+
+  <h2>Step 3 — Make <code>main</code> a thin client of the library</h2>
+  <p>With the logic in the library, the binary's job shrinks to: parse args into sources, read and count each, print, total. Replace the contents of <code>src/main.rs</code> entirely:</p>
+  <pre><code><span class="add">use rwc::{Counts, Source};</span>
+use std::env;
+use std::error::Error;
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+<span class="add">    let args: Vec&lt;String&gt; = env::args().skip(1).collect();</span>
+<span class="add">    let sources = Source::from_args(args);</span>
+
+<span class="add">    let mut total = Counts::default();</span>
+<span class="add">    for source in &amp;sources {</span>
+<span class="add">        let text = source.read().map_err(|e| format!("{}: {}", source.name(), e))?;</span>
+<span class="add">        let c = Counts::from_text(&amp;text);</span>
+<span class="add">        println!("{:&gt;6} {:&gt;6} {:&gt;6} {}", c.lines, c.words, c.chars, source.name());</span>
+<span class="add">        total.add(c);</span>
+<span class="add">    }</span>
+
+<span class="add">    if sources.len() &gt; 1 {</span>
+<span class="add">        println!("{:&gt;6} {:&gt;6} {:&gt;6} total", total.lines, total.words, total.chars);</span>
+<span class="add">    }</span>
+    Ok(())
+}</code></pre>
+  <p>What each new line does:</p>
+  <ul>
+    <li><strong><code>use rwc::{Counts, Source};</code></strong> — The binary is a <em>separate crate</em> from the library, so it imports the library by package name, <code>rwc</code>, exactly as it would any external crate. This is the line that connects the two halves; only <code>pub</code> items (which is why we marked them <code>pub</code> in Steps 1–2) are reachable here.</li>
+    <li><strong><code>let sources = Source::from_args(args);</code></strong> — One call turns the raw arguments into the list of sources. The empty-args case (read stdin) is now handled <em>inside</em> the library, so <code>main</code> doesn't special-case it.</li>
+    <li><strong><code>let mut total = Counts::default();</code></strong> — The zero total, now a named value from the derived <code>Default</code> instead of <code>(0, 0, 0)</code>.</li>
+    <li><strong><code>source.read().map_err(|e| format!("{}: {}", source.name(), e))?</code></strong> — Reading is now a method on the source, so the same line works whether it is a file or stdin. The <code>map_err</code> prefixes the failing source's name to the error (for stdin that name is <code>-</code>), and <code>?</code> bubbles the first failure out of <code>main</code> as before.</li>
+    <li><strong><code>total.add(c);</code></strong> — Method-call form of the accumulator. <code>c</code> is the per-source <code>Counts</code>; <code>total.add(c)</code> folds it in.</li>
+  </ul>
+  <p>Everything now compiles again. The behaviour for files is identical to Lesson 5; the new ability is that <code>rwc</code> with no arguments reads standard input.</p>
+
+  <h2>Step 4 — Document the library with doc-tests</h2>
+  <p>This is the testing topic flagged back in Lesson 3. A <strong>doc-test</strong> is an example written inside a <code>///</code> documentation comment, fenced in triple-backticks. <code>cargo test</code> compiles and <em>runs</em> each one — so your documentation can never silently drift out of date with the code. The catch noted in Lesson 3: <strong>doc-tests run only for library crates.</strong> That is precisely why we created <code>src/lib.rs</code> in this lesson — the examples below would be invisible to <code>cargo test</code> if this logic had stayed in <code>main.rs</code>.</p>
+  <p>Add <code>///</code> comments with examples above the items in <code>src/lib.rs</code>. Here is <code>Counts</code> and its two methods, doc-comments highlighted:</p>
+  <pre><code><span class="add">/// A tally of lines, words, and characters for one piece of text.</span>
+<span class="add">///</span>
+<span class="add">/// ```</span>
+<span class="add">/// use rwc::Counts;</span>
+<span class="add">///</span>
+<span class="add">/// let c = Counts::from_text("hello world\nbye\n");</span>
+<span class="add">/// assert_eq!(c.lines, 2);</span>
+<span class="add">/// assert_eq!(c.words, 3);</span>
+<span class="add">/// assert_eq!(c.chars, 16);</span>
+<span class="add">/// ```</span>
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Counts {
+    pub lines: usize,
+    pub words: usize,
+    pub chars: usize,
+}
+
+impl Counts {
+<span class="add">    /// Count the lines, words, and characters in `text`.</span>
+<span class="add">    ///</span>
+<span class="add">    /// ```</span>
+<span class="add">    /// # use rwc::Counts;</span>
+<span class="add">    /// let c = Counts::from_text("one two three");</span>
+<span class="add">    /// assert_eq!(c.words, 3);</span>
+<span class="add">    /// assert_eq!(c.lines, 1);</span>
+<span class="add">    /// ```</span>
+    pub fn from_text(text: &amp;str) -&gt; Counts {
+        <span class="c">// ... unchanged ...</span>
+    }
+
+<span class="add">    /// Add another tally into this one, field by field.</span>
+<span class="add">    ///</span>
+<span class="add">    /// ```</span>
+<span class="add">    /// # use rwc::Counts;</span>
+<span class="add">    /// let mut total = Counts::default();</span>
+<span class="add">    /// total.add(Counts::from_text("a b\n"));</span>
+<span class="add">    /// total.add(Counts::from_text("c d\n"));</span>
+<span class="add">    /// assert_eq!(total.lines, 2);</span>
+<span class="add">    /// assert_eq!(total.words, 4);</span>
+<span class="add">    /// ```</span>
+    pub fn add(&amp;mut self, other: Counts) {
+        <span class="c">// ... unchanged ...</span>
+    }
+}</code></pre>
+  <p>The first example sits on the <code>struct</code> itself; the other two sit on individual methods. A doc comment — and any example inside it — can attach to any item (a module, type, method, or field), and <code>cargo test</code> runs every fenced example regardless of where it lives. The struct-level one is a <em>how to use this type</em> overview, so it builds a <code>Counts</code> with <code>from_text</code> and checks the fields; each method example focuses on that one method. (When you run the suite in Step 5 you'll see them listed as <code>Counts</code>, <code>Counts::from_text</code>, and <code>Counts::add</code> — the name is just the item the example sits on, not what it tests.)</p>
+  <p>The two doc-test mechanics on display:</p>
+  <ul>
+    <li><strong>The fenced block runs as a test.</strong> The triple-backtick block is compiled into a tiny program and executed; the <code>assert_eq!</code> lines are the actual assertions. If <code>from_text</code> ever returned the wrong count, this test would fail just like a unit test — so the example in your docs is <em>guaranteed</em> to be correct and current.</li>
+    <li><strong><code>#</code> hides a line from the rendered docs but still runs it.</strong> In the first example we show <code>use rwc::Counts;</code> so a reader sees the import; in the later two we write <code># use rwc::Counts;</code> — the leading <code>#</code> means "compile and run this line, but don't display it." It is how you keep examples uncluttered (boilerplate imports, setup) while keeping them runnable. (Note: a <code>String</code> with a literal newline in source is written <code>"a b\n"</code> — the same escape you'd use in C.)</li>
+  </ul>
+  <p>Now document <code>Source</code>. The interesting one is <code>read</code>, whose example must <em>not</em> actually run — reading real standard input would hang the test suite waiting for keyboard input. That is what a <strong>fence annotation</strong> is for:</p>
+  <pre><code>impl Source {
+<span class="add">    /// Read the entire contents of this source into a `String`.</span>
+<span class="add">    ///</span>
+<span class="add">    /// ```no_run</span>
+<span class="add">    /// # use rwc::Source;</span>
+<span class="add">    /// let text = Source::Stdin.read()?;</span>
+<span class="add">    /// println!("{} bytes", text.len());</span>
+<span class="add">    /// # Ok::&lt;(), std::io::Error&gt;(())</span>
+<span class="add">    /// ```</span>
+    pub fn read(&amp;self) -&gt; io::Result&lt;String&gt; {
+        <span class="c">// ... unchanged ...</span>
+    }
+}</code></pre>
+  <ul>
+    <li><strong><code>```no_run</code></strong> — The example is still <em>compiled</em> (so the code is type-checked and can't rot), but it is <em>not executed</em>. Perfect for code that does real IO, networking, or anything you don't want running inside <code>cargo test</code>.</li>
+    <li><strong>The hidden <code># Ok::&lt;(), std::io::Error&gt;(())</code> line</strong> — Because the example uses <code>?</code>, the generated test function has to return a <code>Result</code>. This hidden final line supplies the matching <code>Ok(())</code> (with the error type spelled out via the <code>::&lt;...&gt;</code> "turbofish") so the snippet type-checks — without the reader seeing the plumbing.</li>
+  </ul>
+
+  <p><strong>Your turn</strong> — one method still has no example: <code>from_args</code>. Add a runnable doc-test above its definition showing both behaviours — no arguments yields a single <code>Stdin</code> source, and a list of paths yields one <code>File</code> per path. (It is the fifth doc-test in the run below.)</p>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    /// Turn the command-line arguments (program name already stripped) into a
+    /// list of sources: no arguments means "read standard input", as `wc` does.
+    ///
+    /// ```
+    /// # use rwc::Source;
+    /// let sources = Source::from_args(vec![]);
+    /// assert_eq!(sources.len(), 1); // a single Stdin source
+    ///
+    /// let sources = Source::from_args(vec!["a.txt".to_string(), "b.txt".to_string()]);
+    /// assert_eq!(sources.len(), 2);
+    /// assert_eq!(sources[0].name(), "a.txt");
+    /// ```
+    pub fn from_args(args: Vec&lt;String&gt;) -&gt; Vec&lt;Source&gt; {
+        <span class="c">// ... unchanged ...</span>
+    }</code></pre>
+  </details>
+
+  <div class="compare">
+    <span class="label">The doc-test fence annotations</span>
+    <p>The word after the opening backticks controls how the example is treated. The four you will reach for:</p>
+    <ul>
+      <li><strong><code>```</code> (none)</strong> — compile <em>and</em> run; the default. Assertions inside are real test failures.</li>
+      <li><strong><code>```no_run</code></strong> — compile but don't run. For examples that do IO, networking, or open windows — checked for correctness, never executed.</li>
+      <li><strong><code>```ignore</code></strong> — neither compile nor run. The escape hatch for pseudo-code or a fragment that can't stand alone. Use sparingly: an ignored example is unverified, so it can rot.</li>
+      <li><strong><code>```should_panic</code></strong> — compile and run, and the test <em>passes only if the example panics</em>. Use it to document that a function rejects bad input (e.g. an example that triggers an <code>unwrap()</code> on <code>None</code>).</li>
+      <li><strong><code>```compile_fail</code></strong> — the test passes only if the example <em>fails to compile</em>. Niche but powerful: it lets you prove in your docs that a misuse is rejected by the type system — for instance, that you can't read a moved value.</li>
+    </ul>
+    <p>Reach for the default whenever you can: a runnable example with assertions is documentation that <code>cargo test</code> verifies, so it can't drift out of date with the code.</p>
+  </div>
+
+  <h2>Step 5 — Move the tests, then run everything</h2>
+  <p>The unit tests referred to the old <code>counts()</code> function and tuples, and they belong with the code they test — now in <code>src/lib.rs</code>. Move the <code>#[cfg(test)]</code> module there and update it to the <code>Counts</code> API. The migrated <code>Counts</code> tests are written out as models; the two new tests for <code>Source::from_args</code> are left for you to write:</p>
+  <pre><code>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn counts_ascii() {
+<span class="add">        let c = Counts::from_text("hello world\nthis is a test");</span>
+<span class="add">        assert_eq!(c.lines, 2);</span>
+<span class="add">        assert_eq!(c.words, 6);</span>
+<span class="add">        assert_eq!(c.chars, 26);</span>
+    }
+
+    #[test]
+    fn counts_empty() {
+<span class="add">        assert_eq!(Counts::from_text(""), Counts::default());</span>
+    }
+
+<span class="add">    #[test]</span>
+<span class="add">    fn from_args_empty_is_stdin() {</span>
+<span class="add">        <span class="todo">// TODO (your turn): no args → exactly one source, whose name() is "-"</span></span>
+<span class="add">    }</span>
+
+<span class="add">    #[test]</span>
+<span class="add">    fn from_args_maps_paths_to_files() {</span>
+<span class="add">        <span class="todo">// TODO (your turn): two paths → two sources; assert one's name()</span></span>
+<span class="add">    }</span>
+}</code></pre>
+  <p><strong>Your turn</strong> — write the two <code>from_args</code> tests, using the <code>Counts</code> tests above as models: construct the sources, then assert on <code>.len()</code> and <code>.name()</code>.</p>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    #[test]
+    fn from_args_empty_is_stdin() {
+        let sources = Source::from_args(vec![]);
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].name(), "-");
+    }
+
+    #[test]
+    fn from_args_maps_paths_to_files() {
+        let sources = Source::from_args(vec!["x".to_string(), "y".to_string()]);
+        assert_eq!(sources.len(), 2);
+        assert_eq!(sources[1].name(), "y");
+    }</code></pre>
+  </details>
+  <p>(The Unicode test from Lesson 3 carries over too, reworded to read <code>c.chars</code> instead of the tuple's <code>.2</code>.) The <code>counts_empty</code> test now leans on the derived traits: <code>Counts::default()</code> is the all-zero value and <code>==</code> works because we derived <code>PartialEq</code>. Run the full suite:</p>
+  <pre class="shell"><code>cargo test</code></pre>
+  <pre class="shell"><code>     Running unittests src/lib.rs
+
+running 6 tests
+test tests::add_accumulates ... ok
+test tests::counts_empty ... ok
+test tests::counts_unicode ... ok
+test tests::from_args_empty_is_stdin ... ok
+test tests::counts_ascii ... ok
+test tests::from_args_maps_paths_to_files ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; ...
+
+     Running unittests src/main.rs
+
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; ...
+
+   Doc-tests rwc
+
+running 5 tests
+test src/lib.rs - Counts (line 16) ... ok
+test src/lib.rs - Counts::add (line 54) ... ok
+test src/lib.rs - Counts::from_text (line 38) ... ok
+test src/lib.rs - Source::from_args (line 87) ... ok
+test src/lib.rs - Source::read (line 122) - compile ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; ...</code></pre>
+  <p>Three suites now run from one command: the <strong>unit tests</strong> in the library, the (empty) suite for the binary, and the <strong>doc-tests</strong>. Notice the last line: <code>Source::read ... - compile ... ok</code> — the <code>- compile</code> marks the <code>no_run</code> example, which was compiled but not executed, exactly as intended.</p>
+  <p>Finally, exercise both input paths and confirm <code>clippy</code> is clean:</p>
+  <pre class="shell"><code>cargo run -- ../MISSION.md ../NOTES.md
+echo "hello world from stdin" | cargo run
+cargo clippy</code></pre>
+  <pre class="shell"><code>    19    199   1229 ../MISSION.md
+    57   1449  10155 ../NOTES.md
+    76   1648  11384 total
+     1      4     23 -</code></pre>
+  <p>The first invocation prints a per-file line plus a total, as before. The second pipes text in with no arguments, so <code>rwc</code> reads standard input — labelled <code>-</code> in the last column — proving the <code>Source::Stdin</code> path works end to end.</p>
+
+  <div class="win">
+    <span class="label">Outcome</span>
+    <code>rwc</code> is now built from named types: a <code>Counts</code> struct whose named fields say what the tuple positions never did and whose derives give you <code>Default</code>, equality, and copy semantics for free, and a <code>Source</code> enum that models <em>file vs stdin</em>, which is what makes reading piped input work. The logic lives in a library crate, which let you write runnable <strong>doc-tests</strong> — examples that <code>cargo test</code> compiles and runs — alongside the unit tests. One <code>cargo test</code> now runs unit tests <em>and</em> doc-tests, and <code>clippy</code> is clean.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>Implement <code>Display</code> for <code>Counts</code>.</strong> Instead of formatting the columns in <code>main</code>, give <code>Counts</code> a <code>std::fmt::Display</code> implementation so you can write <code>println!("{c} {}", source.name())</code>. (This is a first taste of implementing a trait by hand — the subject of Module 4.)</li>
+    <li><strong>Add a <code>should_panic</code> doc-test.</strong> Write a small associated function that <code>unwrap()</code>s something that can be <code>None</code>, and document it with a <code>```should_panic</code> example proving it panics on the bad input. Run <code>cargo test</code> and watch it pass <em>because</em> it panicked.</li>
+    <li><strong>Try a <code>compile_fail</code> doc-test.</strong> Add a <code>```compile_fail</code> example that takes a <code>&amp;mut</code> of an immutable binding (the <code>E0596</code> from Lesson 5). The doc-test passes precisely because that code does <em>not</em> compile — your documentation now proves a misuse is rejected.</li>
+    <li><strong>Support <code>-</code> as an explicit stdin argument.</strong> Real <code>wc</code> treats a lone <code>-</code> on the command line as "read stdin here." Extend <code>from_args</code> to map the string <code>"-"</code> to <code>Source::Stdin</code>. (You'll want <code>match</code> or an <code>if</code> on the path — a natural lead-in to Lesson 7.)</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">What is the key difference between a <code>struct</code> and an <code>enum</code>?</p>
+    <button class="quiz-opt" data-correct>A struct holds all its fields at once; an enum is exactly one of its variants at a time</button>
+    <button class="quiz-opt">A struct can have methods but an enum cannot</button>
+    <button class="quiz-opt">An enum can hold data but a struct cannot</button>
+    <p class="quiz-fb ok" hidden>Right — a struct is a product type ("fields A <em>and</em> B <em>and</em> C"), an enum is a sum type ("variant A <em>or</em> B"). Both can carry data and both can have <code>impl</code> blocks with methods.</p>
+    <p class="quiz-fb no" hidden>Both can have <code>impl</code> blocks, and both can carry data. The real distinction is "and" vs "or": a struct holds all fields simultaneously; an enum is exactly one variant at a time.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">Why did the counting logic have to move into <code>src/lib.rs</code> for the doc-tests to run?</p>
+    <button class="quiz-opt" data-correct>Doc-tests are collected and run only for library crates, not binary crates</button>
+    <button class="quiz-opt"><code>///</code> comments are a syntax error in <code>main.rs</code></button>
+    <button class="quiz-opt">Binary crates cannot contain <code>#[test]</code> functions</button>
+    <p class="quiz-fb ok" hidden>Correct — <code>cargo test</code> compiles and runs doc-tests only for the library target. The same <code>///</code> examples in <code>main.rs</code> would be ignored. (This was the caveat flagged in Lesson 3.)</p>
+    <p class="quiz-fb no" hidden><code>///</code> is valid anywhere and binaries can hold <code>#[test]</code> functions. The specific limitation is that <em>doc-tests</em> are gathered only from library crates — hence the move to <code>lib.rs</code>.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">You write a doc-test whose example opens a network connection. Which fence keeps it type-checked but stops it from running during <code>cargo test</code>?</p>
+    <button class="quiz-opt" data-correct><code>```no_run</code></button>
+    <button class="quiz-opt"><code>```ignore</code></button>
+    <button class="quiz-opt"><code>```should_panic</code></button>
+    <p class="quiz-fb ok" hidden>Right — <code>no_run</code> compiles the example (so it can't rot) but never executes it. <code>ignore</code> would skip compilation too (leaving it unverified), and <code>should_panic</code> is about asserting a panic.</p>
+    <p class="quiz-fb no" hidden><code>ignore</code> skips compilation as well, so the example could silently rot; <code>should_panic</code> asserts the example panics. The one that compiles-but-doesn't-run is <code>no_run</code>.</p>
+  </div>
+
+  <h2>Primary sources</h2>
+  <p>The canonical treatment of both types is <a href="https://doc.rust-lang.org/book/ch05-00-structs.html"><strong>The Rust Book, Ch. 5 — "Using Structs"</strong></a> and <a href="https://doc.rust-lang.org/book/ch06-00-enums.html"><strong>Ch. 6 — "Enums and Pattern Matching"</strong></a> (Ch. 6's <code>match</code> material is the main topic of Lesson 7). Doc-tests, the hidden-<code>#</code> trick, and every fence annotation are documented in <a href="https://doc.rust-lang.org/rustdoc/write-documentation/documentation-tests.html"><strong>The rustdoc Book — "Documentation tests."</strong></a></p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If a derive doesn't compile (e.g. you derive <code>Eq</code> on a type containing a <code>f64</code>), paste the error — those messages are very readable now. Next: <strong>Lesson 7 covers <code>match</code> in depth</strong> — the same <code>Source</code> enum, but now with exhaustiveness as a compile-time guarantee (add a variant and watch every <code>match</code> demand you handle it), plus guards, bindings, and the <code>if let</code>/<code>let else</code> shorthands.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0005-borrow-checker-errors.html">◂ Lesson 5: Borrow-checker errors</a>
+      <a href="https://doc.rust-lang.org/book/ch05-00-structs.html">📘 Book Ch. 5–6</a>
+      <span>Next ▸ Lesson 7: Pattern matching with match</span>
+    </div>
+  </div>
+</div>

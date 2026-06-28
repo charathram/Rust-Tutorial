@@ -75,14 +75,14 @@
   <p class="lead">This course builds real, runnable programs. Each module declares what you will be able to <em>do</em>, states its prerequisites, and ends in a checkpoint deliverable with acceptance criteria. Two cumulative checkpoints interleave everything learned so far. The <a href="../reference/glossary.html">glossary</a> holds shared vocabulary; curated sources back every claim.</p>
 
   <h2>The mission</h2>
-  <p>Reach the point where Rust is a default tool — building CLI utilities and web backends that are fast, correct, and memory-safe without a garbage collector. The course is assessed against the mission's own success criteria: ship a non-trivial CLI end to end; stand up a small web service; read and resolve ownership, borrowing, and error-handling code without guessing.</p>
+  <p>Get to where you reach for Rust by default — building CLI utilities and web backends that are fast, correct, and memory-safe without a garbage collector. The course is assessed against three success criteria: ship a non-trivial CLI end to end; stand up a small web service; read and resolve ownership, borrowing, and error-handling code without guessing.</p>
 
   <h2>How the course works</h2>
   <ul>
-    <li><strong>Project-anchored — an honest hybrid.</strong> A single Module 0 primer deliberately front-loads the ownership model — the one exception. <em>From the first numbered lesson onward, every concept is introduced by a concrete feature of the tool currently being built</em> — no standalone theory marches.</li>
+    <li><strong>Project-anchored, with one exception.</strong> A single Module 0 primer front-loads the ownership model up front. <em>From the first numbered lesson onward, every concept is introduced by a concrete feature of the tool currently being built</em> — no theory taught in isolation.</li>
     <li><strong>Outcomes, prerequisites &amp; checkpoints.</strong> Each module lists measurable outcomes, the modules it assumes, and a deliverable judged against stated acceptance criteria. Within a module, lessons are strictly sequential — so module prerequisites plus that ordering define the full dependency graph.</li>
     <li><strong>Spaced &amp; genuinely interleaved.</strong> Modules carry a review step that recalls earlier material in new work, and two <span class="tag">Interleaved checkpoint</span> problem sets (after Modules 4 and 6) mix tasks drawn at random from <em>all</em> prior modules — the strict sense of interleaving, not just spaced repetition.</li>
-    <li><strong>Practice in the wild.</strong> Each module names a community touchpoint (<a href="https://users.rust-lang.org/">users.rust-lang.org</a>, <a href="https://www.reddit.com/r/rust/">r/rust</a>) for real-world critique — the "wisdom" pillar.</li>
+    <li><strong>Practice in the wild.</strong> Each module names a community touchpoint (<a href="https://users.rust-lang.org/">users.rust-lang.org</a>, <a href="https://www.reddit.com/r/rust/">r/rust</a>) where you can post your work and get real critique.</li>
     <li><strong>Reproducibility.</strong> Projects pin a toolchain (<code>rust-toolchain.toml</code>, currently 1.96) and lock crate versions. The web-stack modules (axum, sqlx) track fast-moving crates and will be version-refreshed when reached.</li>
   </ul>
 
@@ -105,7 +105,7 @@
   <!-- ===================== MODULE 0 ===================== -->
   <div class="module">
     <h2>Module 0 · Orientation</h2>
-    <p class="module-goal">The one concept worth meeting before writing code — read once, then build. Not a project lesson.</p>
+    <p class="module-goal">The one concept to learn before writing any code — read once, then build. Not a project lesson.</p>
     <p class="outcomes-h">After the primer you can:</p>
     <ul class="outcomes">
       <li>State the three ownership rules and predict whether a snippet compiles.</li>
@@ -146,7 +146,7 @@
   <!-- ===================== MODULE 2 ===================== -->
   <div class="module">
     <h2>Module 2 · Structuring a program</h2>
-    <p class="module-goal">Grow <code>rwc</code> into a multi-file, stdin-aware tool — a real feature each lesson, refactored under green tests. The new behaviour is what forces each concept.</p>
+    <p class="module-goal">Grow <code>rwc</code> into a multi-file, stdin-aware tool — one real feature per lesson, refactored while the tests stay green. Each new feature is what introduces the concept.</p>
     <p class="outcomes-h">By the end you can:</p>
     <ul class="outcomes">
       <li>Pass data by reference (<code>&amp;</code>, <code>&amp;mut</code>) and state the borrowing rules.</li>
@@ -254,7 +254,7 @@
   <!-- ===================== MODULE 6 ===================== -->
   <div class="module">
     <h2>Module 6 · Shared ownership &amp; concurrency</h2>
-    <p class="module-goal">The hard core: shared and interior-mutable state, threads, and the async model — the bridge to web servers.</p>
+    <p class="module-goal">The hardest part of the course: shared and interior-mutable state, threads, and the async model. This is what the web-server modules build on.</p>
     <p class="outcomes-h">By the end you can:</p>
     <ul class="outcomes">
       <li>Use <code>Rc</code>/<code>Arc</code>, <code>RefCell</code>/<code>Mutex</code>, and explain when each is needed.</li>
@@ -286,7 +286,7 @@
   <!-- ===================== MODULE 7 ===================== -->
   <div class="module">
     <h2>Module 7 · Web backends</h2>
-    <p class="module-goal">The second half of the mission: a real, tested HTTP service with <code>axum</code>, sharing state via <code>Arc</code>. <em>Crate versions refreshed when this module is reached.</em></p>
+    <p class="module-goal">A real, tested HTTP service with <code>axum</code>, sharing state via <code>Arc</code>. <em>Crate versions refreshed when this module is reached.</em></p>
     <p class="outcomes-h">By the end you can:</p>
     <ul class="outcomes">
       <li>Build an <code>axum</code> service with routes, handlers, and JSON responses.</li>
@@ -330,7 +330,7 @@
   </div>
 
   <div class="ask">
-    <strong>This is a living plan.</strong> The mission steers it; modules can be reordered, expanded, or compressed as you progress. If a topic matters more (or less) to your goals, say so and the syllabus will follow.
+    <strong>This plan can change.</strong> Modules can be reordered, expanded, or compressed as you progress. If a topic matters more (or less) to your goals, say so and the syllabus will be adjusted.
   </div>
 
   <div class="lesson-foot">

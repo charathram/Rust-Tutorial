@@ -9,7 +9,7 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Lesson 4 · Build-along</p>
   <h1>Borrowing &amp; references</h1>
-  <p class="subtitle">Grow <code>rwc</code> to count <em>several</em> files and print a grand total. Passing data around without giving up ownership is what forces the two kinds of reference — shared <code>&amp;</code> and mutable <code>&amp;mut</code> — and the one rule that governs them.</p>
+  <p class="subtitle">Grow <code>rwc</code> to count <em>several</em> files and print a grand total. Passing data around without giving up ownership needs the two kinds of reference — shared <code>&amp;</code> and mutable <code>&amp;mut</code> — and the one rule that governs them.</p>
 
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
@@ -26,8 +26,8 @@
   </div>
 
   <h2>Why borrowing, and why now</h2>
-  <p>You have already used a borrow without dwelling on it: <code>counts(&amp;text)</code> hands the counting function a <strong>reference</strong> to the text rather than the text itself, so <code>main</code> keeps ownership and can still use <code>text</code> afterwards. That was the cheap, obvious case. This lesson makes <code>rwc</code> accept <em>several</em> files and print a total across them — and that feature forces the rest of the borrowing model into the open: you will keep a list of paths alive while looping over it, and you will let a helper function <em>modify</em> a running total in place. Each need maps onto a specific kind of reference, and Rust enforces exactly one rule about how they may coexist.</p>
-  <p>A <strong>reference</strong> is Rust's way of letting code use a value <em>without taking ownership of it</em> — no move, no copy, just temporary access that the compiler tracks. Coming from C, a reference is morally a pointer the compiler refuses to let you misuse; coming from Go, it is like passing a pointer except the aliasing rules are checked at compile time instead of trusted at runtime.</p>
+  <p>You have already used a borrow: <code>counts(&amp;text)</code> hands the counting function a <strong>reference</strong> to the text rather than the text itself, so <code>main</code> keeps ownership and can still use <code>text</code> afterwards. That was the simple case. This lesson makes <code>rwc</code> accept <em>several</em> files and print a total across them, which needs the rest of the borrowing model: you will keep a list of paths usable while looping over it, and you will let a helper function <em>modify</em> a running total in place. Each need maps onto a specific kind of reference, and Rust enforces one rule about how they may coexist.</p>
+  <p>A <strong>reference</strong> lets code use a value <em>without taking ownership of it</em> — no move, no copy, just temporary access that the compiler tracks. Coming from C, a reference is a pointer that the compiler won't let you misuse; coming from Go, it is like passing a pointer except the aliasing rules are checked at compile time instead of trusted at runtime.</p>
 
   <h2>Step 1 — Accept several file paths</h2>
   <p>Replace the single-argument handling in <code>main</code> with code that gathers <em>all</em> the path arguments and loops over them:</p>
@@ -49,7 +49,7 @@
   <ul>
     <li><strong><code>let paths: Vec&lt;String&gt; = env::args().skip(1).collect();</code></strong> — Three things at once. <code>env::args()</code> yields the command-line arguments as an iterator, and the <em>first</em> item is always the program's own name, so <code>.skip(1)</code> drops it and leaves just the user's file paths. <code>.collect()</code> then drains that iterator into a collection — but <code>collect</code> can build many different collections, so it needs to be told which one; the type annotation <code>: Vec&lt;String&gt;</code> on the left is what tells it. A <code>Vec&lt;String&gt;</code> is a growable, heap-allocated array (a "vector") of owned <code>String</code> values — Rust's equivalent of a dynamic list, and the owner of every path it holds.</li>
     <li><strong><code>if paths.is_empty() { … std::process::exit(2); }</code></strong> — With multiple files now allowed, "no argument given" is the empty-vector case. <code>is_empty()</code> returns <code>true</code> when there are zero paths; we print usage to stderr and exit with code <code>2</code>, exactly as the single-file version did.</li>
-    <li><strong><code>for path in &amp;paths {</code></strong> — The central borrowing point of this step. The <code>&amp;</code> means we loop over a <em>shared borrow</em> of the vector, so each <code>path</code> is a <code>&amp;String</code> (a reference into <code>paths</code>) and the vector itself is only lent to the loop, not consumed by it. That is why <code>paths</code> is still alive and usable after the loop — we rely on that in Step 2 to ask <code>paths.len()</code>. Had you written <code>for path in paths</code> (no <code>&amp;</code>), the loop would have <em>taken ownership</em> of the vector and consumed it, and <code>paths</code> would no longer exist afterwards.</li>
+    <li><strong><code>for path in &amp;paths {</code></strong> — The borrow that matters in this step. The <code>&amp;</code> means we loop over a <em>shared borrow</em> of the vector, so each <code>path</code> is a <code>&amp;String</code> (a reference into <code>paths</code>) and the vector itself is only lent to the loop, not consumed by it. That is why <code>paths</code> is still usable after the loop — Step 2 relies on that to call <code>paths.len()</code>. Had you written <code>for path in paths</code> (no <code>&amp;</code>), the loop would <em>take ownership</em> of the vector and consume it, and <code>paths</code> would no longer exist afterwards.</li>
     <li><strong><code>fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?</code></strong> — The error message now leads with <em>which</em> file failed (<code>{path}</code>), which matters once several files are in play. The <code>?</code> still bubbles the first failure out of <code>main</code> as before.</li>
   </ul>
   <p>The <code>counts(&amp;text)</code> and <code>println!</code> lines are unchanged — they have simply moved inside the loop so they run once per file.</p>
@@ -103,7 +103,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
       <li><strong><code>&amp;T</code> — a shared (immutable) borrow.</strong> You may have as many of these at once as you like; all of them are read-only.</li>
       <li><strong><code>&amp;mut T</code> — a mutable (exclusive) borrow.</strong> You may have exactly one, and while it exists <em>no other borrow of that value may exist</em> — not even a shared one.</li>
     </ul>
-    <p>In one line: <strong>at any moment a value may have either one <code>&amp;mut</code> or any number of <code>&amp;</code>, never both.</strong> (Shared XOR mutable.) A second, quieter rule rides along: a reference may never outlive the data it points to — Rust simply will not compile a dangling reference. Making that second rule explicit in type signatures is the job of <em>lifetimes</em>, which you meet in Lesson 9.</p>
+    <p>In one line: <strong>at any moment a value may have either one <code>&amp;mut</code> or any number of <code>&amp;</code>, never both.</strong> (Shared XOR mutable.) There is a second rule too: a reference may never outlive the data it points to — Rust will not compile a dangling reference. Making that second rule explicit in type signatures is what <em>lifetimes</em> do, which you meet in Lesson 9.</p>
     <p>This is how Rust eliminates data races and aliasing bugs <em>at compile time</em>, with no garbage collector. In C, nothing stops two mutable pointers to the same object, and the bugs that follow are yours to find. In Go, aliasing is free and a data race is caught — if you are lucky — at runtime by the race detector. Rust pulls that check forward into the compiler: a program that violates shared-XOR-mutable does not build.</p>
   </div>
 
@@ -135,7 +135,7 @@ test result: ok. 4 passed; 0 failed; 0 ignored; ...</code></pre>
 
   <div class="win">
     <span class="label">Outcome</span>
-    <code>rwc</code> now counts any number of files and totals them, and you have used both kinds of reference for real: a shared <code>&amp;</code> to read a value without consuming it (<code>&amp;text</code>, <code>&amp;paths</code>) and an exclusive <code>&amp;mut</code> to modify one in place (<code>&amp;mut total</code>). The shared-XOR-mutable rule is the single idea the rest of Rust's safety story is built on.
+    <code>rwc</code> now counts any number of files and totals them, and you have used both kinds of reference: a shared <code>&amp;</code> to read a value without consuming it (<code>&amp;text</code>, <code>&amp;paths</code>) and an exclusive <code>&amp;mut</code> to modify one in place (<code>&amp;mut total</code>). Most of Rust's compile-time safety guarantees rest on the shared-XOR-mutable rule.
   </div>
 
   <h2>Optional extensions</h2>
@@ -177,7 +177,7 @@ test result: ok. 4 passed; 0 failed; 0 ignored; ...</code></pre>
   <p>The canonical treatment, with the same <code>&amp;</code> / <code>&amp;mut</code> distinction and the shared-XOR-mutable rule spelled out: <a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"><strong>The Rust Book, Ch. 4.2 — "References and Borrowing."</strong></a> Chapter 4.1 ("What Is Ownership?") is the move model this builds on, and 4.3 ("The Slice Type") is where <code>&amp;str</code> comes from — both revisited in Lesson 8.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> If you hit a borrow-checker error you didn't expect — especially from the first optional extension — paste it. Reading those messages well is the entire subject of the next lesson: <strong>Lesson 5 reproduces the real <code>E03xx</code> errors</strong> you meet while pushing <code>rwc</code> further, and decodes what each one is actually telling you.
+    <strong>Questions are welcome.</strong> If you hit a borrow-checker error you didn't expect — especially from the first optional extension — paste it. Reading those messages is what the next lesson covers: <strong>Lesson 5 reproduces the real <code>E03xx</code> errors</strong> you meet while pushing <code>rwc</code> further, and decodes what each one is telling you.
   </div>
 
   <div class="lesson-foot">

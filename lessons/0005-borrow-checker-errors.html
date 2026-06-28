@@ -9,7 +9,7 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Lesson 5 · Diagnostics</p>
   <h1>Reading borrow-checker errors</h1>
-  <p class="subtitle">Lesson 4 gave you the rules; this lesson makes you fluent in what happens when you break them. You will deliberately introduce four classic <code>E03xx</code> errors into <code>rwc</code>, learn to read each message part by part, and apply its standard fix — so the borrow checker becomes a tool you consult, not an obstacle you fight.</p>
+  <p class="subtitle">Lesson 4 gave you the rules; this lesson is about what happens when you break them. You will deliberately introduce four classic <code>E03xx</code> errors into <code>rwc</code>, learn to read each message part by part, and apply its standard fix.</p>
 
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
@@ -22,16 +22,16 @@
 
   <div class="note">
     <span class="label">Starting point</span>
-    Work in <code>0005-rwc/</code>, a clean copy of the finished, tested tool from <a href="./0004-borrowing.html">Lesson 4</a> (multi-file counting with a grand total). Confirm it is green before you start — <code>cargo test</code> should report <code>4 passed</code>. Each step below has you <em>break</em> the code on purpose, read the resulting error, then put it back. Nothing here changes <code>rwc</code> permanently; the deliverable is the skill, not a feature.
+    Work in <code>0005-rwc/</code>, a clean copy of the finished, tested tool from <a href="./0004-borrowing.html">Lesson 4</a> (multi-file counting with a grand total). Confirm it is green before you start — <code>cargo test</code> should report <code>4 passed</code>. Each step below has you <em>break</em> the code on purpose, read the resulting error, then put it back. Nothing here changes <code>rwc</code> permanently; you are practising reading errors, not adding a feature.
   </div>
 
   <h2>Why a lesson on errors</h2>
-  <p>Coming from C, a type error is often a terse one-liner and a data race is no error at all — just a crash next Tuesday. Rust takes the opposite bet: it refuses to compile a whole category of bugs, and in exchange it spends real effort <em>explaining</em> each refusal. A borrow-checker error is not a wall; it is the compiler telling you, with line numbers and arrows, exactly which Lesson 4 rule the code violates and usually how to satisfy it. The skill this lesson builds is reading that explanation quickly instead of guessing — because once you can, the borrow checker turns from the thing slowing you down into the thing catching your mistakes before they ship.</p>
+  <p>In C, a type error is often a terse one-liner and a data race produces no error at all — just a crash later in production. Rust does the opposite: it refuses to compile a whole category of bugs, and it spends real effort <em>explaining</em> each refusal. A borrow-checker error tells you, with line numbers and arrows, exactly which Lesson 4 rule the code violates and usually how to fix it. This lesson teaches you to read that explanation quickly instead of guessing, so the borrow checker catches your mistakes before they ship rather than slowing you down.</p>
   <p>Every error below is one you will hit for real while writing Rust. We provoke them in <code>rwc</code> on purpose so you meet them in code you already understand.</p>
 
   <div class="compare">
     <span class="label">How to read any rustc error</span>
-    <p>Every <code>rustc</code> diagnostic has the same anatomy. Learn the parts once and every future error becomes skimmable:</p>
+    <p>Every <code>rustc</code> diagnostic has the same structure. Learn the parts once and you can skim any future error:</p>
     <ul>
       <li><strong><code>error[E0382]: borrow of moved value</code></strong> — the <em>error code</em> (clickable concept you can look up) and a one-line summary. The code is the most searchable thing in the whole message.</li>
       <li><strong><code>--&gt; src/main.rs:37:8</code></strong> — the <em>location</em>: file, line, column of the primary problem.</li>
@@ -44,7 +44,7 @@
 
   <h2>Step 1 — <code>E0596</code>: a value you forgot to make mutable</h2>
   <p>The most common borrow error is also the simplest. In <code>main</code>, drop the <code>mut</code> from the totals binding so it reads:</p>
-  <pre><code>    <span class="add">let total = (0, 0, 0);</span>
+  <pre><code><span class="add">    let total = (0, 0, 0);</span>
     for path in &amp;paths {</code></pre>
   <p>Run <code>cargo build</code>. You get:</p>
   <pre class="shell"><code>error[E0596]: cannot borrow `total` as mutable, as it is not declared as mutable
@@ -68,9 +68,9 @@ For more information about this error, try `rustc --explain E0596`.</code></pre>
   <p><strong>Fix:</strong> put the <code>mut</code> back. This is the compiler enforcing that mutation is never silent — a reader (and the compiler) can tell a binding is mutable just by looking at its declaration.</p>
 
   <h2>Step 2 — <code>E0382</code>: using a value after it moved</h2>
-  <p>This is <em>the</em> ownership error, and the one Lesson 4 was quietly steering you around when it insisted on <code>for path in &amp;paths</code>. Remove that <code>&amp;</code> so the loop consumes the vector:</p>
+  <p>This is the central ownership error, and the reason Lesson 4 used <code>for path in &amp;paths</code> instead of <code>for path in paths</code>. Remove that <code>&amp;</code> so the loop consumes the vector:</p>
   <pre><code>    let mut total = (0, 0, 0);
-    <span class="add">for path in paths {</span>
+<span class="add">    for path in paths {</span>
         let text = fs::read_to_string(&amp;path)</code></pre>
   <p>(You also need <code>&amp;path</code> on the next line now, because <code>path</code> is an owned <code>String</code> rather than a reference — but that is not what breaks.) Build it:</p>
   <pre class="shell"><code>error[E0382]: borrow of moved value: `paths`
@@ -92,20 +92,20 @@ help: consider iterating over a slice of the `Vec&lt;String&gt;`'s content to av
     |                 +
 
 For more information about this error, try `rustc --explain E0382`.</code></pre>
-  <p>This message has <em>three</em> labelled spans, and reading all three is the whole skill — they tell a little story in order:</p>
+  <p>This message has <em>three</em> labelled spans, and reading all three is the whole skill. In order:</p>
   <ul>
-    <li><strong>Line 23 — "move occurs because <code>paths</code> has type <code>Vec&lt;String&gt;</code>, which does not implement the <code>Copy</code> trait."</strong> This is the root cause stated plainly. A <code>Vec</code> owns heap memory, so it is a <em>move</em> type, not a <code>Copy</code> type — handing it somewhere transfers ownership rather than duplicating it. (Recall the rule from our earlier discussion: own a resource ⇒ move; trivially copyable ⇒ <code>Copy</code>.)</li>
-    <li><strong>Line 30 — "<code>paths</code> moved due to this implicit call to <code>.into_iter()</code>."</strong> Here is the subtle part the message hands you for free: <code>for x in collection</code> desugars to <code>collection.into_iter()</code>, and <code>into_iter</code> <em>takes ownership</em> (the <code>note</code> spells this out). So the loop didn't borrow <code>paths</code> — it ate it. After the loop, <code>paths</code> no longer exists.</li>
+    <li><strong>Line 23 — "move occurs because <code>paths</code> has type <code>Vec&lt;String&gt;</code>, which does not implement the <code>Copy</code> trait."</strong> This is the root cause. A <code>Vec</code> owns heap memory, so it is a <em>move</em> type, not a <code>Copy</code> type — handing it somewhere transfers ownership rather than duplicating it. (The rule from Lesson 4: own a resource ⇒ move; trivially copyable ⇒ <code>Copy</code>.)</li>
+    <li><strong>Line 30 — "<code>paths</code> moved due to this implicit call to <code>.into_iter()</code>."</strong> This is the subtle part the message points out: <code>for x in collection</code> desugars to <code>collection.into_iter()</code>, and <code>into_iter</code> <em>takes ownership</em> (the <code>note</code> spells this out). So the loop didn't borrow <code>paths</code> — it consumed it. After the loop, <code>paths</code> no longer exists.</li>
     <li><strong>Line 37 — "value borrowed here after move."</strong> This is the primary span: the place that fails. Calling <code>paths.len()</code> needs <code>paths</code> to still be alive, but line 30 already moved it away. The conflict is between line 30 (move) and line 37 (use).</li>
   </ul>
-  <p><strong>Fix:</strong> the <code>help</code> nails it — iterate over <code>&amp;paths</code>, which calls <code>.iter()</code> and only <em>borrows</em> the vector, leaving it intact for <code>paths.len()</code> afterwards. That is precisely why Lesson 4 wrote the loop that way. Put the <code>&amp;</code> back (and restore <code>read_to_string(path)</code>).</p>
+  <p><strong>Fix:</strong> do what the <code>help</code> says — iterate over <code>&amp;paths</code>, which calls <code>.iter()</code> and only <em>borrows</em> the vector, leaving it intact for <code>paths.len()</code> afterwards. That is why Lesson 4 wrote the loop that way. Put the <code>&amp;</code> back (and restore <code>read_to_string(path)</code>).</p>
 
   <h2>Step 3 — <code>E0502</code>: a shared and a mutable borrow at the same time</h2>
-  <p>Now provoke the rule at the heart of Lesson 4 — <em>shared XOR mutable</em>. Inside the loop, take a plain (shared) borrow of <code>total</code>, then mutate it through <code>add_into</code>, then use the shared borrow afterwards:</p>
+  <p>Now provoke the main rule from Lesson 4 — <em>shared XOR mutable</em>. Inside the loop, take a plain (shared) borrow of <code>total</code>, then mutate it through <code>add_into</code>, then use the shared borrow afterwards:</p>
   <pre><code>        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
-        <span class="add">let peek = &amp;total;</span>
+<span class="add">        let peek = &amp;total;</span>
         add_into(&amp;mut total, (lines, words, chars));
-        <span class="add">println!("running subtotal so far: {:?}", peek);</span></code></pre>
+<span class="add">        println!("running subtotal so far: {:?}", peek);</span></code></pre>
   <pre class="shell"><code>error[E0502]: cannot borrow `total` as mutable because it is also borrowed as immutable
   --&gt; src/main.rs:36:18
    |
@@ -129,10 +129,10 @@ For more information about this error, try `rustc --explain E0502`.</code></pre>
   <h2>Step 4 — <code>E0499</code>: two mutable borrows at once</h2>
   <p>The mutable-side of the same rule: <code>&amp;mut</code> is exclusive even against <em>another</em> <code>&amp;mut</code>. Force two live mutable borrows of <code>total</code>:</p>
   <pre><code>        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
-        <span class="add">let a = &amp;mut total;</span>
-        <span class="add">let b = &amp;mut total;</span>
-        <span class="add">add_into(b, (lines, words, chars));</span>
-        <span class="add">add_into(a, (0, 0, 0));</span></code></pre>
+<span class="add">        let a = &amp;mut total;</span>
+<span class="add">        let b = &amp;mut total;</span>
+<span class="add">        add_into(b, (lines, words, chars));</span>
+<span class="add">        add_into(a, (0, 0, 0));</span></code></pre>
   <pre class="shell"><code>error[E0499]: cannot borrow `total` as mutable more than once at a time
   --&gt; src/main.rs:36:17
    |
@@ -174,11 +174,11 @@ For more information about this error, try `rustc --explain E0499`.</code></pre>
   <p>After undoing all four experiments, <code>rwc</code> should be byte-for-byte the finished Lesson 4 tool. Verify nothing leaked:</p>
   <pre class="shell"><code>cargo test
 cargo run -- ../MISSION.md ../NOTES.md</code></pre>
-  <p>You should again see <code>4 passed</code> and a per-file-plus-total listing. The point of the lesson isn't a code change — it's that the next time the borrow checker stops you, you read the message instead of bracing for a fight.</p>
+  <p>You should again see <code>4 passed</code> and a per-file-plus-total listing. The point of the lesson isn't a code change — it's that the next time the borrow checker stops you, you read the message instead of guessing at a fix.</p>
 
   <div class="win">
     <span class="label">Outcome</span>
-    You can now read a borrow-checker error the way the compiler intends: code, summary, the conflicting spans, help. You met the four you will hit most — <code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code> — saw each as one of Lesson 4's rules being enforced, and learned the single mental model that fixes most of them: a borrow lasts until its last use, and shared excludes mutable. <code>rustc --explain</code> and the Error Index cover everything else.
+    You can now read a borrow-checker error part by part: code, summary, the conflicting spans, help. You met the four you will hit most — <code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code> — saw each as one of Lesson 4's rules being enforced, and learned the model that fixes most of them: a borrow lasts until its last use, and shared excludes mutable. <code>rustc --explain</code> and the Error Index cover everything else.
   </div>
 
   <h2>Optional extensions</h2>
@@ -220,7 +220,7 @@ cargo run -- ../MISSION.md ../NOTES.md</code></pre>
   <p>The canonical reference for every code in this lesson is the <a href="https://doc.rust-lang.org/error_codes/error-index.html"><strong>Rust Error Index</strong></a> — the same text <code>rustc --explain</code> prints. The rules being enforced are <a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"><strong>The Rust Book, Ch. 4.2 — "References and Borrowing"</strong></a> (shared XOR mutable), and the "last use" behaviour is <em>non-lexical lifetimes</em>, summarised in <a href="https://doc.rust-lang.org/edition-guide/rust-2018/ownership-and-lifetimes/non-lexical-lifetimes.html"><strong>the Edition Guide</strong></a>.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> Paste any borrow-checker error you hit — in <code>rwc</code> or elsewhere — and we will read it together. The next lesson stops breaking <code>rwc</code> and starts reshaping it: <strong>Lesson 6 introduces <code>struct</code>s and <code>enum</code>s</strong>, replacing the <code>(usize, usize, usize)</code> tuple with a named <code>Counts</code> struct and modelling <em>file vs stdin</em> input as a <code>Source</code> enum.
+    <strong>Questions are welcome.</strong> Paste any borrow-checker error you hit — in <code>rwc</code> or elsewhere — and we will read it together. The next lesson stops breaking <code>rwc</code> and starts changing it: <strong>Lesson 6 introduces <code>struct</code>s and <code>enum</code>s</strong>, replacing the <code>(usize, usize, usize)</code> tuple with a named <code>Counts</code> struct and modelling <em>file vs stdin</em> input as a <code>Source</code> enum.
   </div>
 
   <div class="lesson-foot">

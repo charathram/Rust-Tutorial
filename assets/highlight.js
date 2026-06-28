@@ -66,7 +66,7 @@
   function skip(node, root) {
     var p = node.parentNode;
     while (p && p !== root) {
-      if (p.classList && (p.classList.contains('c') || p.classList.contains('err'))) return true;
+      if (p.classList && (p.classList.contains('c') || p.classList.contains('err') || p.classList.contains('todo'))) return true;
       p = p.parentNode;
     }
     return false;

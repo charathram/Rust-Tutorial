@@ -158,6 +158,32 @@ pre > code { counter-reset: ln; }
 .c  { color: #8a8478; font-style: italic; }
 .err { color: var(--no); font-weight: 600; }
 
+/* Exercise scaffolding: a withheld body shows as a .todo line in the code block
+   ("// TODO (your turn): ..."), with the answer in a collapsible .solution reveal.
+   linenumbers.js still promotes the (green) line; highlight.js skips .todo so the
+   amber cue isn't re-tokenised as a plain comment. */
+.todo { color: #b76b01; font-weight: 600; font-style: normal; }
+details.solution {
+  margin: -0.4rem 0 1.4rem;
+  border-left: 3px solid var(--rust);
+  background: var(--rust-soft);
+  border-radius: 0 4px 4px 0;
+  padding: 0 0.9rem;
+}
+details.solution > summary {
+  cursor: pointer;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--rust);
+  padding: 0.5rem 0;
+  user-select: none;
+}
+details.solution[open] > summary { padding-bottom: 0.3rem; }
+details.solution pre { margin: 0 0 0.8rem; }
+
 /* Syntax highlighting tokens (added by highlight.js). Palette tuned to read
    on both the code background and the green .add (changed-line) background. */
 .tok-kw   { color: #8959a8; }                    /* keywords  — purple */

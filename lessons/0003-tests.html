@@ -51,7 +51,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 }</code></pre>
   <p>What changed, and why each piece looks the way it does:</p>
   <ul>
-    <li><strong><code>fn counts(text: &amp;str) -&gt; (usize, usize, usize)</code></strong> — A new function. It takes <code>text</code> as a <code>&amp;str</code> — a <em>borrowed</em> view of the string (the counting only needs to read the text, not own it), which is the same borrowing idea you met as <code>&amp;path</code> in Lesson 1. It returns a <strong>tuple</strong> of three <code>usize</code> values: a tuple is a fixed-size group of values, written in parentheses, and <code>usize</code> is the unsigned integer type Rust uses for counts and sizes. So this function promises: "give me some text, I'll give you back its line, word, and character counts."</li>
+    <li><strong><code>fn counts(text: &amp;str) -&gt; (usize, usize, usize)</code></strong> — A new function. It takes <code>text</code> as a <code>&amp;str</code> — a <em>borrowed</em> view of the string (the counting only needs to read the text, not own it), which is the same borrowing idea you met as <code>&amp;path</code> in Lesson 1. It returns a <strong>tuple</strong> of three <code>usize</code> values: a tuple is a fixed-size group of values, written in parentheses, and <code>usize</code> is the unsigned integer type Rust uses for counts and sizes. In short: pass in text, get back its line, word, and character counts.</li>
     <li><strong>The three <code>let</code> lines and <code>(lines, words, chars)</code></strong> — These moved verbatim out of <code>main</code>. The final line is the function's return value: Rust returns the value of the last expression in a function when it has no trailing semicolon, so this bare tuple <em>is</em> what <code>counts</code> hands back. No <code>return</code> keyword is needed.</li>
     <li><strong><code>let (lines, words, chars) = counts(&amp;text);</code></strong> — Back in <code>main</code>, this calls the function and <em>destructures</em> the returned tuple into three named variables in one step, so the <code>println!</code> below it works exactly as before. We pass <code>&amp;text</code> — a borrow — so <code>main</code> keeps ownership of the file contents.</li>
   </ul>
@@ -90,7 +90,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 <span class="add">        assert_eq!(counts(""), (0, 0, 0));</span>
 <span class="add">    }</span>
 <span class="add">}</span></code></pre>
-  <p>Each annotation and macro here is doing specific work — none of it is boilerplate to skim past:</p>
+  <p>What each annotation and macro does:</p>
   <ul>
     <li><strong><code>#[cfg(test)]</code></strong> — An <em>attribute</em> (the <code>#[…]</code> syntax) that conditionally compiles the module: the code inside is built <em>only</em> when you run <code>cargo test</code>, and is left out of your normal release binary entirely. So tests cost you nothing in the shipped program. (Rust Book, <a href="https://doc.rust-lang.org/book/ch11-01-writing-tests.html">Ch. 11.1</a>.)</li>
     <li><strong><code>mod tests { … }</code></strong> — Declares a module named <code>tests</code> to hold the test functions. The name is conventional, not required.</li>
@@ -109,7 +109,7 @@ test tests::counts_ascii ... ok
 test tests::counts_are_unicode_aware ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; ...</code></pre>
-  <p>Now make a test fail on purpose — change <code>assert_eq!(w, 4)</code> to <code>assert_eq!(w, 5)</code> and re-run. Read how <code>cargo test</code> reports the mismatch (it prints <code>left</code> and <code>right</code>), then change it back. That failure report is the feedback loop you will lean on for every change from here on.</p>
+  <p>Now make a test fail on purpose — change <code>assert_eq!(w, 4)</code> to <code>assert_eq!(w, 5)</code> and re-run. Read how <code>cargo test</code> reports the mismatch (it prints <code>left</code> and <code>right</code>), then change it back. That failure report is the feedback loop you will use for every change from here on.</p>
 
   <div class="win">
     <span class="label">Outcome</span>

@@ -35,7 +35,7 @@
   <h2>Step 0 — Run the generated project</h2>
   <p><code>cargo new</code> left a hello-world in <code>src/main.rs</code>. Confirm the toolchain works before changing anything:</p>
   <pre class="shell"><code>cargo run</code></pre>
-  <p>You should see <code>Hello, world!</code>. Cargo compiled <code>src/main.rs</code> to <code>target/debug/rwc</code> and ran it — that compile-and-run cycle is the entire workflow.</p>
+  <p>You should see <code>Hello, world!</code>. Cargo compiled <code>src/main.rs</code> to <code>target/debug/rwc</code> and ran it. Compile and run is the whole workflow.</p>
 
   <h2>Step 1 — Read a command-line argument</h2>
   <p>Replace the contents of <code>src/main.rs</code> with:</p>
@@ -46,11 +46,11 @@ fn main() {
     println!("counting: {path}");
 }</code></pre>
 
-  <p>That fourth line packs in several new ideas. Read left to right:</p>
+  <p>What each part of the fourth line does, left to right:</p>
   <ul>
     <li><strong><code>env::args()</code></strong> — Returns the program's command-line arguments, but not as an array. It returns an <strong>iterator</strong>: a lazy sequence you pull values from one at a time, rather than a collection holding them all at once. (If you know Python generators, it is the same idea.) The methods that follow are how you draw a value out of that iterator.</li>
     <li><strong><code>.nth(1)</code></strong> — Pulls the item at position 1 from the iterator. Positions are zero-based, and position 0 is always the path to the program itself, so the first argument a user actually typed is at position 1 — the file path we want.</li>
-    <li><strong><code>.expect("…")</code></strong> — There may be no argument at position 1, so the previous step does not return a plain value (the next callout explains exactly what it returns). <code>.expect</code> says: if a value is present, hand it over; if not, stop the program immediately and print this message. It is the quick, blunt way to deal with the "missing" case for now.</li>
+    <li><strong><code>.expect("…")</code></strong> — There may be no argument at position 1, so the previous step does not return a plain value (the next callout explains exactly what it returns). <code>.expect</code> returns the value if one is present; if not, it stops the program immediately and prints this message. For now this is how we handle a missing argument.</li>
     <li><strong><code>println!("… {path}")</code></strong> — Prints a line of text. The <code>!</code> tells you <code>println</code> is a <em>macro</em>, not a function — for now, just read <code>!</code> as "this is a macro" and move on. The <code>{path}</code> inside the string is filled in with the value of the <code>path</code> variable, the same way an f-string works in Python or a template literal in JavaScript.</li>
   </ul>
 
@@ -73,10 +73,10 @@ fn main() {
 <span class="add">    let text = fs::read_to_string(&amp;path).expect("could not read file");</span>
 <span class="add">    print!("{text}");</span>
 }</code></pre>
-  <p>Here is what each new piece does:</p>
+  <p>What each new line does:</p>
   <ul>
     <li><strong><code>fs::read_to_string(&amp;path)</code></strong> — Opens the file at <code>path</code> and reads its entire contents into a single <code>String</code> in memory. For the files we are counting, reading everything at once keeps the program simple.</li>
-    <li><strong><code>&amp;path</code></strong> — The <code>&amp;</code> passes the function a <em>borrowed view</em> of <code>path</code> instead of handing the value over. The function only needs to read the path, so a borrow is enough, and <code>path</code> stays usable afterward. The blue callout below connects this to the ownership rule from the primer — it is worth reading.</li>
+    <li><strong><code>&amp;path</code></strong> — The <code>&amp;</code> passes the function a <em>borrowed view</em> of <code>path</code> instead of handing the value over. The function only needs to read the path, so a borrow is enough, and <code>path</code> stays usable afterward. The blue callout below connects this to the ownership rule from the primer.</li>
     <li><strong><code>.expect("could not read file")</code></strong> — Reading a file can fail for ordinary reasons: the file may not exist, or you may lack permission. As with the argument in Step 1, the read does not return a plain <code>String</code> — it returns a value that is either the contents or an error, and <code>.expect</code> takes the contents or, on failure, stops the program with this message. (Lesson 2 replaces this with proper error handling.)</li>
     <li><strong><code>print!</code> (no <code>ln</code>)</strong> — Prints its text with no trailing newline added. We use <code>print!</code> rather than <code>println!</code> here because the file's contents already end in a newline, and we do not want to add a second blank line.</li>
   </ul>
@@ -107,7 +107,7 @@ fn main() {
   <ul>
     <li><strong><code>text.lines()</code></strong> — Gives an iterator that yields the text one line at a time. On its own it counts nothing; chaining <code>.count()</code> walks the whole iterator and returns how many items it produced — here, the number of lines.</li>
     <li><strong><code>text.split_whitespace()</code></strong> — Gives an iterator over the runs of non-whitespace between spaces, tabs, and newlines — in other words, the words. <code>.count()</code> then tallies them. This matches how <code>wc</code> defines a "word."</li>
-    <li><strong><code>text.chars()</code></strong> — Gives an iterator over the text's characters (Unicode scalar values), and <code>.count()</code> tallies those. Why characters and not bytes matters is the subject of the callout just below.</li>
+    <li><strong><code>text.chars()</code></strong> — Gives an iterator over the text's characters (Unicode scalar values), and <code>.count()</code> tallies those. The callout below explains why this counts characters rather than bytes.</li>
     <li><strong><code>{lines:&gt;6}</code></strong> — Inside the format string, this is the same <code>{variable}</code> interpolation as before, plus a <em>format specifier</em> after the colon. <code>&gt;6</code> means "right-align this value in a field at least 6 characters wide," which lines the three numbers up into neat columns the way <code>wc</code> does.</li>
   </ul>
   <pre class="shell"><code>cargo run -- ../MISSION.md</code></pre>

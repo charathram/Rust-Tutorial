@@ -9,11 +9,11 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Module 0 · Orientation</p>
   <h1>The Ownership Model</h1>
-  <p class="subtitle">The one idea worth meeting before you write any Rust: how it manages memory without a garbage collector, and the move semantics behind its most common beginner error.</p>
+  <p class="subtitle">How Rust manages memory without a garbage collector, and the move semantics behind its most common beginner error. Read this before you write any Rust.</p>
 
   <div class="note">
     <span class="label">How to use this primer</span>
-    This is the single piece of theory the course front-loads — read it once for the mental model, then start building in <a href="./0001-build-rwc-cli.html">Lesson 1</a>. You do <em>not</em> need to master borrowing, lifetimes, or the borrow checker here; each is taught when a project first needs it (Modules 2 onward). Treat this as orientation, not a lesson to complete.
+    This is the only theory the course front-loads — read it once for the mental model, then start building in <a href="./0001-build-rwc-cli.html">Lesson 1</a>. You do <em>not</em> need to master borrowing, lifetimes, or the borrow checker here; each is taught when a project first needs it (Modules 2 onward). This is orientation, not a lesson to complete.
   </div>
 
   <h2>What this primer covers</h2>
@@ -90,7 +90,7 @@ println!("{x} {y}");  <span class="c">// ✓ fine — i32 is Copy, x is still va
   </div>
 
   <h2>Check your understanding</h2>
-  <p>Answer from memory — a quick self-check that the mental model landed. You'll put it to work, not on a quiz, starting in <a href="./0001-build-rwc-cli.html">Lesson 1</a>.</p>
+  <p>Answer from memory to check the mental model stuck. You'll apply it in code, not on a quiz, starting in <a href="./0001-build-rwc-cli.html">Lesson 1</a>.</p>
 
   <div class="quiz">
     <p class="quiz-q">After <code>let b = a;</code> where <code>a: String</code>, what is the state of <code>a</code>?</p>
@@ -120,7 +120,7 @@ println!("{x} {y}");  <span class="c">// ✓ fine — i32 is Copy, x is still va
   </div>
 
   <h2>Primary source</h2>
-  <p>Read this once, carefully — it is the highest-trust explanation and includes the stack/heap diagrams (~15 min): <a href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html"><strong>The Rust Book, Ch. 4.1 — "What Is Ownership?"</strong></a></p>
+  <p>Read this once — it is the authoritative explanation and includes the stack/heap diagrams (~15 min): <a href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html"><strong>The Rust Book, Ch. 4.1 — "What Is Ownership?"</strong></a></p>
 
   <div class="ask">
     <strong>Questions are welcome.</strong> If you want to know why <code>Copy</code> and <code>Clone</code> are separate traits, or how ownership interacts with function calls and return values, ask in the chat — and revisit this primer anytime the borrow checker surprises you.
