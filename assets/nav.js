@@ -17,7 +17,8 @@
     { n: '3', title: 'Tests',            file: '0003-tests.html' },
     { n: '4', title: 'Borrowing &amp; references', file: '0004-borrowing.html' },
     { n: '5', title: 'Reading borrow-checker errors', file: '0005-borrow-checker-errors.html' },
-    { n: '6', title: 'Structs &amp; enums', file: '0006-structs-enums.html' }
+    { n: '6', title: 'Structs &amp; enums', file: '0006-structs-enums.html' },
+    { n: '7', title: 'Pattern matching', file: '0007-pattern-matching.html' }
   ];
   var REFS = [
     { title: 'Glossary', href: '../reference/glossary.html' }

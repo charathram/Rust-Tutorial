@@ -60,8 +60,24 @@
       <dd>A custom type that is exactly <em>one of</em> a fixed set of <em>variants</em> (a "sum type" / tagged union), and a variant may carry data — e.g. <code>Source::Stdin</code> or <code>Source::File(String)</code>. The compiler tracks which variant is active; you read it back with <code>match</code>. <code>Option</code> and <code>Result</code> are standard-library enums.</dd>
     </div>
     <div class="term">
+      <dt>Exhaustiveness <span class="seen">(Lesson 7)</span></dt>
+      <dd>A <code>match</code> must cover every possible case. For an enum that means an arm per variant (or a <code>_</code> wildcard). Add a variant and every non-wildcard <code>match</code> stops compiling (<code>E0004</code>) until it handles the new case — a compile-time guarantee that you never forget one.</dd>
+    </div>
+    <div class="term">
+      <dt>Guard (match) <span class="seen">(Lesson 7)</span></dt>
+      <dd>An extra condition on a <code>match</code> arm, written <code>pattern if condition</code>. The arm runs only when the pattern matches <em>and</em> the condition is true, e.g. <code>Source::File(path) if path.ends_with(".md")</code>. A guard does not count toward exhaustiveness.</dd>
+    </div>
+    <div class="term">
+      <dt><code>if let</code> / <code>let else</code> <span class="seen">(Lesson 7)</span></dt>
+      <dd>Shorthands for matching a single pattern. <code>if let PAT = expr { … }</code> runs the block only when the pattern matches, and the binding is scoped to that block. <code>let PAT = expr else { … }</code> binds when the pattern matches and otherwise runs an <code>else</code> block that must diverge (<code>return</code>/<code>break</code>/<code>continue</code>/<code>panic!</code>); the binding then stays in scope.</dd>
+    </div>
+    <div class="term">
       <dt>Library crate vs binary crate <span class="seen">(Lesson 6)</span></dt>
       <dd><code>src/main.rs</code> is a <em>binary</em> crate (produces an executable); <code>src/lib.rs</code> is a <em>library</em> crate (reusable code, imported by package name, e.g. <code>use rwc::Counts</code>). A package can hold both, with the binary depending on the library.</dd>
+    </div>
+    <div class="term">
+      <dt><code>match</code> <span class="seen">(Lesson 6, 7)</span></dt>
+      <dd>An expression that compares a value against a series of <em>patterns</em> and runs the first arm that fits, producing a value. Works on any type — an enum, an integer, a string slice. Arms can bind a variant's data (<code>Source::File(path)</code>) and carry guards; the set of arms must be exhaustive.</dd>
     </div>
     <div class="term">
       <dt>Move</dt>
@@ -82,6 +98,10 @@
     <div class="term">
       <dt>panic</dt>
       <dd>An unrecoverable abort for bugs/impossible states. Unwinds the stack, prints a message and backtrace hint to stderr, and exits with code <code>101</code>. Triggered by <code>panic!</code>, <code>.unwrap()</code>, <code>.expect()</code>. Prefer <code>Result</code> for expected failures. <span class="seen">Lesson 2</span></dd>
+    </div>
+    <div class="term">
+      <dt>Pattern <span class="seen">(Lesson 7)</span></dt>
+      <dd>The shape on the left of a <code>match</code> arm (or in <code>if let</code>, <code>let else</code>, and ordinary <code>let</code>). A pattern can be a literal (<code>"-"</code>), the wildcard (<code>_</code>), a variant that binds its data (<code>Source::File(path)</code>), a range (<code>0..=9</code>), or a binding with <code>@</code>.</dd>
     </div>
     <div class="term">
       <dt>Pure function</dt>

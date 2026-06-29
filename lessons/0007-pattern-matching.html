@@ -1,0 +1,320 @@
+<meta charset="utf-8">
+<title>Lesson 7 — Pattern matching with match</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 7 · Build-along</p>
+  <h1>Pattern matching with <code>match</code></h1>
+  <p class="subtitle">Go deeper on the <code>match</code> you already used in <code>Source</code>. Teach <code>rwc</code> to read standard input from a lone <code>-</code>, lean on the compiler's exhaustiveness check, and pick up guards, bindings, and the <code>if let</code> / <code>let else</code> shorthands.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Match on any value — an enum, or a plain string — with literal patterns and the <code>_</code> wildcard.</li>
+    <li>Bind data out of a variant (pull the path out of <code>Source::File</code>).</li>
+    <li>Add a condition to an arm with a <em>guard</em>.</li>
+    <li>Rely on exhaustiveness: add an enum variant and the compiler points at every <code>match</code> that must handle it.</li>
+    <li>Reach for <code>if let</code> and <code>let else</code> when you care about a single variant.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0007-rwc/</code>, a clean copy of your finished Lesson 6 tool — the <code>Counts</code> struct and <code>Source</code> enum, tests green. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write — attempt it, then open <em>Show solution</em> to check.
+  </div>
+
+  <h2>Why match, and why now</h2>
+  <p>You already wrote two <code>match</code> expressions in Lesson 6: <code>Source::name</code> and <code>Source::read</code> both branch on which variant <code>self</code> is. That is the common case, but <code>match</code> does more. This lesson uses it to add one real feature — reading stdin from a lone <code>-</code>, the way <code>wc</code> does — and then covers the parts you reach for constantly: exhaustiveness, guards, bindings, and the <code>if let</code> / <code>let else</code> shorthands.</p>
+  <p>Coming from C or Go, <code>match</code> is like <code>switch</code> with two differences that matter: the compiler checks you have covered every case, and a pattern can pull data out of the value it matches.</p>
+
+  <h2>Step 1 — Match on a value: read stdin from <code>-</code></h2>
+  <p>Real <code>wc</code> treats a lone <code>-</code> argument as "read standard input here", so <code>cat a | wc - b</code> mixes piped input with a file. Right now <code>from_args</code> turns every argument into a <code>Source::File</code>:</p>
+  <pre><code>    pub fn from_args(args: Vec&lt;String&gt;) -&gt; Vec&lt;Source&gt; {
+        if args.is_empty() {
+            vec![Source::Stdin]
+        } else {
+            args.into_iter().map(Source::File).collect()
+        }
+    }</code></pre>
+  <p>So far you have matched on an enum (<code>self</code>). But <code>match</code> works on any value, including a string. Here is <code>name</code> from Lesson 6 as a reminder of the shape — one arm per case, each arm a <code>pattern =&gt; value</code>:</p>
+  <pre><code>    pub fn name(&amp;self) -&gt; &amp;str {
+        match self {
+            Source::File(path) =&gt; path,
+            Source::Stdin =&gt; "-",
+        }
+    }</code></pre>
+  <p>Rewrite <code>from_args</code> so each argument is matched: the string <code>"-"</code> becomes <code>Source::Stdin</code>, and anything else becomes a <code>Source::File</code>.</p>
+  <pre><code>    pub fn from_args(args: Vec&lt;String&gt;) -&gt; Vec&lt;Source&gt; {
+<span class="add">        if args.is_empty() {</span>
+<span class="add">            return vec![Source::Stdin];</span>
+<span class="add">        }</span>
+<span class="add">        args.into_iter()</span>
+<span class="add">            .map(|arg| match arg.as_str() {</span>
+<span class="add">                <span class="todo">// TODO (your turn): map "-" to Stdin, anything else to a File</span></span>
+<span class="add">            })</span>
+<span class="add">            .collect()</span>
+    }</code></pre>
+  <p><strong>Your turn</strong> — write the two arms. The first is a literal pattern (<code>"-"</code>); the second is the wildcard <code>_</code>, which matches anything and here binds nothing because you use the captured <code>arg</code> instead.</p>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn from_args(args: Vec&lt;String&gt;) -&gt; Vec&lt;Source&gt; {
+        if args.is_empty() {
+            return vec![Source::Stdin];
+        }
+        args.into_iter()
+            .map(|arg| match arg.as_str() {
+                "-" =&gt; Source::Stdin,
+                _ =&gt; Source::File(arg),
+            })
+            .collect()
+    }</code></pre>
+  </details>
+  <p>What changed, and why:</p>
+  <ul>
+    <li><strong><code>match arg.as_str()</code></strong> — <code>arg</code> is a <code>String</code>; the literal pattern <code>"-"</code> is a <code>&amp;str</code>, so <code>as_str()</code> gives the <code>&amp;str</code> to match against. The same <code>match</code> machinery works on a string as on an enum.</li>
+    <li><strong><code>"-" =&gt; Source::Stdin</code></strong> — a <em>literal pattern</em>. The arm runs only when the argument is exactly <code>-</code>.</li>
+    <li><strong><code>_ =&gt; Source::File(arg)</code></strong> — the <em>wildcard</em> <code>_</code> matches every other string. <code>match</code> is an expression, so each arm produces the <code>Source</code> that <code>.map</code> collects. A string is an <em>open</em> set — infinitely many values — so a catch-all is required here; you can't spell out every string. Contrast Step 2, where <code>Source</code> is a finite enum you own and you'll <em>drop</em> the catch-all on purpose so the compiler flags any variant you add later.</li>
+    <li><strong><code>return vec![Source::Stdin];</code></strong> — an early return for the no-arguments case, so the rest of the function isn't nested in an <code>else</code>.</li>
+  </ul>
+
+  <h2>Step 2 — Exhaustiveness: add a variant, watch every <code>match</code> fail</h2>
+  <p>The reason <code>match</code> is safe is that the compiler checks you have handled every case. To see it, add a third variant to <code>Source</code> — a URL source, say — and build:</p>
+  <pre><code>pub enum Source {
+    File(String),
+    #[default]
+    Stdin,
+<span class="add">    Url(String),</span>
+}</code></pre>
+  <pre class="shell"><code>cargo build</code></pre>
+  <pre class="shell"><code>error[E0004]: non-exhaustive patterns: `&amp;Source::Url(_)` not covered
+   --&gt; src/lib.rs:112:15
+    |
+112 |         match self {
+    |               ^^^^ pattern `&amp;Source::Url(_)` not covered
+    |
+note: `Source` defined here
+   --&gt; src/lib.rs:67:10
+    |
+ 67 | pub enum Source {
+    |          ^^^^^^
+...
+ 71 |     Url(String),
+    |     --- not covered
+help: ensure that all possible cases are being handled by adding a match arm
+    |
+114 ~             Source::Stdin =&gt; "-",
+115 ~             &amp;Source::Url(_) =&gt; todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `&amp;Source::Url(_)` not covered
+   --&gt; src/lib.rs:129:15
+    |
+129 |         match self {
+    |               ^^^^ pattern `&amp;Source::Url(_)` not covered
+
+error: could not compile `rwc` (lib) due to 2 previous errors</code></pre>
+  <p>Two errors, one per <code>match</code>: both <code>name</code> and <code>read</code> stop compiling until they handle <code>Url</code>. The message names the uncovered variant and even drafts the arm to add. This is the guarantee — you cannot forget a case, and the compiler tells you exactly where.</p>
+  <p>This works because <code>name</code> and <code>read</code> list explicit arms (<code>File</code>, <code>Stdin</code>). Had they ended in a catch-all <code>_ =&gt; "-"</code>, the new <code>Url</code> would have fallen through it silently and the compiler would have said nothing. For enums you own, prefer explicit arms over <code>_</code>, so the compiler walks you through every match when the enum grows.</p>
+  <p>We are not adding URLs, so <strong>remove the <code>Url</code> line</strong> and rebuild to get back to green. The point was the guarantee, not the feature.</p>
+
+  <h2>Step 3 — Bindings and guards</h2>
+  <p>An arm like <code>Source::File(path) =&gt; …</code> does two things at once: it matches the <code>File</code> variant <em>and</em> binds the <code>String</code> inside it to <code>path</code>. That binding is how you read a variant's data — it is why <code>name</code> can return the path. You can also bind a value while testing it, with <code>name @ pattern</code>:</p>
+  <pre><code>let n = 5;
+match n {
+    digit @ 0..=9 =&gt; println!("one digit: {digit}"),
+    other =&gt; println!("{other}"),
+}</code></pre>
+  <p>A <em>guard</em> adds a condition to an arm, written <code>pattern if condition</code>. The arm runs only when the pattern matches and the guard is true:</p>
+  <pre><code>let size = 1500;
+let bucket = match size {
+    0 =&gt; "empty",
+    n if n &lt; 1024 =&gt; "small",
+    _ =&gt; "large",
+};</code></pre>
+  <p><strong>Your turn</strong> — combine a binding and a guard. Add a <code>describe</code> method to <code>Source</code> (alongside <code>name</code> and <code>read</code> in the <code>impl Source</code> block) that labels it, calling out markdown files specially. A <code>File</code> whose path ends in <code>.md</code> should read <code>"&lt;path&gt; (markdown)"</code>; any other <code>File</code> is just its path; <code>Stdin</code> is <code>"-"</code>. The doc-comment is written for you — fill in the match arms.</p>
+  <pre><code>    /// Returns a label for the source: the file path, with " (markdown)"
+    /// appended for `.md` files, or "-" for standard input.
+    ///
+    /// ```
+    /// use rwc::Source;
+    /// assert_eq!(Source::File("notes.md".to_string()).describe(), "notes.md (markdown)");
+    /// assert_eq!(Source::File("a.txt".to_string()).describe(), "a.txt");
+    /// assert_eq!(Source::Stdin.describe(), "-");
+    /// ```
+    pub fn describe(&amp;self) -&gt; String {
+        match self {
+            <span class="todo">// TODO (your turn): File ending in ".md"  =&gt; "&lt;path&gt; (markdown)"</span>
+            <span class="todo">// TODO (your turn): any other File        =&gt; the path</span>
+            <span class="todo">// TODO (your turn): Stdin                  =&gt; "-"</span>
+        }
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn describe(&amp;self) -&gt; String {
+        match self {
+            Source::File(path) if path.ends_with(".md") =&gt; format!("{path} (markdown)"),
+            Source::File(path) =&gt; path.clone(),
+            Source::Stdin =&gt; "-".to_string(),
+        }
+    }</code></pre>
+  </details>
+  <p>Order matters: the guarded <code>File</code> arm comes first, so a <code>.md</code> path is caught before the plain <code>File</code> arm. A guard does not count toward exhaustiveness — the compiler still requires the second, unguarded <code>File</code> arm to cover the files that are not markdown.</p>
+
+  <h2>Step 4 — <code>if let</code> and <code>let else</code></h2>
+  <p>When you care about a single variant, a full <code>match</code> is noisy. <code>if let</code> runs a block only when one pattern matches:</p>
+  <pre><code>let source = Source::File("a.txt".to_string());
+if let Source::File(path) = &amp;source {
+    println!("counting {path}");
+}</code></pre>
+  <p><code>let else</code> is the mirror image: it binds when the pattern matches, and when it does not, the <code>else</code> block must leave the scope (<code>return</code>, <code>break</code>, <code>continue</code>, or <code>panic!</code>). It is how you pull a value out and bail early in one line, with the binding staying in scope afterward.</p>
+  <p><strong>Your turn</strong> — add a <code>path_or_dash</code> method to <code>Source</code> that returns a <code>File</code>'s path as an owned <code>String</code>, or <code>"-"</code> for <code>Stdin</code>, using <code>let … else</code>. The doc-comment is written for you — fill in the body.</p>
+  <pre><code>    /// Returns the file path as an owned `String`, or "-" for standard input.
+    ///
+    /// ```
+    /// use rwc::Source;
+    /// assert_eq!(Source::File("a.txt".to_string()).path_or_dash(), "a.txt");
+    /// assert_eq!(Source::Stdin.path_or_dash(), "-");
+    /// ```
+    pub fn path_or_dash(&amp;self) -&gt; String {
+        <span class="todo">// TODO (your turn): bind the path out of File with `let ... else`,</span>
+        <span class="todo">// TODO (your turn): returning "-" for the Stdin case</span>
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn path_or_dash(&amp;self) -&gt; String {
+        let Source::File(path) = self else {
+            return "-".to_string();
+        };
+        path.clone()
+    }</code></pre>
+  </details>
+  <p>Note where <code>path</code> lives: after a <code>let … else</code> the binding is available for the rest of the function, not just inside a block. That is the difference from <code>if let</code>, whose binding is scoped to its block.</p>
+  <p><code>path_or_dash</code> deliberately mirrors <code>name</code> from Lesson 6, with one difference: <code>name</code> returns a <code>&amp;str</code> borrowed from <code>self</code>, while <code>path_or_dash</code> returns an owned <code>String</code> — reach for it when the value must outlive the <code>Source</code> it came from.</p>
+
+  <h2>Step 5 — Use <code>describe</code> in the output, then test and run</h2>
+  <p>Put <code>describe</code> to work. In <code>main.rs</code>, the per-source label calls <code>name()</code>; switch it to <code>describe()</code> so <code>.md</code> files are flagged in the output:</p>
+  <pre><code>        println!(
+            "{:&gt;6} {:&gt;6} {:&gt;6} {}",
+            counts.lines,
+            counts.words,
+            counts.bytes,
+<span class="add">            source.describe()</span>
+        );</code></pre>
+  <p><code>name()</code> returns a <code>&amp;str</code> and <code>describe()</code> returns a <code>String</code>; both drop into the <code>{}</code> slot. A non-markdown file's label is unchanged, so existing output stays the same — only <code>.md</code> files gain the suffix. (<code>name()</code> is still used in the error message, so it is not dead code.)</p>
+  <p>Next, document the new <code>-</code> handling by extending <code>from_args</code>'s doc-test:</p>
+  <pre><code>    /// let sources = Source::from_args(vec![]);
+    /// assert_eq!(sources.len(), 1);
+    /// assert_eq!(sources[0], Source::Stdin);
+<span class="add">    ///</span>
+<span class="add">    /// // A lone "-" means standard input.</span>
+<span class="add">    /// let sources = Source::from_args(vec!["-".to_string()]);</span>
+<span class="add">    /// assert_eq!(sources[0], Source::Stdin);</span>
+    /// ```</code></pre>
+  <p>Then add a unit test alongside the Lesson 6 ones:</p>
+  <pre><code>#[cfg(test)]
+mod tests {
+    <span class="c">// ... the Lesson 6 tests, unchanged ...</span>
+
+<span class="add">    #[test]</span>
+<span class="add">    fn from_args_dash_is_stdin() {</span>
+<span class="add">        <span class="todo">// TODO (your turn): from_args(["-"]) is one source, and it is Stdin</span></span>
+<span class="add">    }</span>
+}</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    #[test]
+    fn from_args_dash_is_stdin() {
+        let sources = Source::from_args(vec!["-".to_string()]);
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0], Source::Stdin);
+    }</code></pre>
+  </details>
+  <p>Run the suite. The new unit test joins the Lesson 6 ones, and the doc-test now exercises <code>-</code> too:</p>
+  <pre class="shell"><code>cargo test</code></pre>
+  <pre class="shell"><code>running 7 tests
+test tests::counts_ascii ... ok
+test tests::counts_unicode ... ok
+test tests::counts_empty ... ok
+test tests::from_args_empty_defaults_to_stdin ... ok
+test tests::from_args_map_paths_to_files ... ok
+test tests::add_accumulates_counts ... ok
+test tests::from_args_dash_is_stdin ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; ...
+
+   Doc-tests rwc
+
+running 9 tests
+test result: ok. 9 passed; 0 failed; 0 ignored; ...</code></pre>
+  <p>Finally, exercise the new <code>-</code> path end to end — a real file and piped input in the same run:</p>
+  <pre class="shell"><code>printf 'a b c\n' &gt; demo.txt
+printf 'piped\n' | cargo run -- demo.txt -</code></pre>
+  <pre class="shell"><code>     1      3      6 demo.txt
+     1      1      6 -
+     2      4     12 total</code></pre>
+  <p>The second line, labelled <code>-</code>, is the piped input: the lone <code>-</code> argument was matched to <code>Source::Stdin</code>, and both inputs fold into the total.</p>
+  <p>And the new label — point <code>rwc</code> at a markdown file:</p>
+  <pre class="shell"><code>printf '# Title\n' &gt; notes.md
+cargo run -- notes.md</code></pre>
+  <pre class="shell"><code>     1      2      8 notes.md (markdown)</code></pre>
+  <p><code>describe</code> matched the <code>.md</code> path with its guarded arm and appended the tag; a plain <code>.txt</code> file shows just its name.</p>
+
+  <div class="win">
+    <span class="label">Outcome</span>
+    <code>rwc</code> now reads standard input from a lone <code>-</code>, the way <code>wc</code> does. Along the way you matched on a plain string rather than an enum, watched the compiler enforce exhaustiveness when the enum grew, and used guards, bindings, and the <code>if let</code> / <code>let else</code> shorthands.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>Reject unknown flags with a guard.</strong> An argument like <code>-l</code> currently becomes a <code>Source::File("-l")</code> that fails at read time with a confusing message. Add a guard arm <code>flag if flag.starts_with('-')</code> before the wildcard and report a clear error (you will need <code>from_args</code> to return a <code>Result</code>, rippling into <code>main</code>).</li>
+    <li><strong>Make the <code>Url</code> variant real.</strong> Add a <code>Source::Literal(String)</code> for text given inline, handle it in <code>name</code> and <code>read</code> (<code>read</code> just returns the string), and let the compiler walk you through every <code>match</code> that needs the new arm.</li>
+    <li><strong>Use <code>matches!</code>.</strong> When you only need a yes/no, <code>matches!(source, Source::Stdin)</code> is shorter than a full <code>match</code>. Add an <code>is_stdin(&amp;self) -&gt; bool</code> method with it.</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">A <code>match</code> on <code>Source</code> handles only <code>File</code> and <code>Stdin</code>. You add a <code>Url</code> variant. What happens?</p>
+    <button class="quiz-opt" data-correct>It fails to compile (E0004, non-exhaustive) until you handle <code>Url</code></button>
+    <button class="quiz-opt">It compiles, then panics at runtime when it sees a <code>Url</code></button>
+    <button class="quiz-opt">It compiles and silently ignores the <code>Url</code> case</button>
+    <p class="quiz-fb ok" hidden>Right — <code>match</code> must be exhaustive, so the compiler rejects the code (and names the missing variant) until every case is handled.</p>
+    <p class="quiz-fb no" hidden>Exhaustiveness is checked at <em>compile</em> time: the code won't build until <code>Url</code> is handled. There's no runtime panic and nothing is silently skipped — unless you used a <code>_</code> catch-all, which absorbs new variants without warning.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">What does the guard do in <code>Source::File(path) if path.ends_with(".md") =&gt; …</code>?</p>
+    <button class="quiz-opt" data-correct>The arm runs only when it is a <code>File</code> <em>and</em> the path ends with <code>.md</code></button>
+    <button class="quiz-opt">It converts the path to a <code>.md</code> file</button>
+    <button class="quiz-opt">It makes the arm match every <code>File</code>, ignoring the condition</button>
+    <p class="quiz-fb ok" hidden>Right — a guard is an extra boolean condition. The pattern must match and the condition must be true. A later unguarded <code>File</code> arm is still needed for the non-markdown files.</p>
+    <p class="quiz-fb no" hidden>A guard only <em>tests</em> a condition; it changes nothing. The arm fires when the pattern matches and the guard is true, so you still need a plain <code>File</code> arm for paths that don't end in <code>.md</code>.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">In <code>let Source::File(path) = source else { … };</code>, what must the <code>else</code> block do?</p>
+    <button class="quiz-opt" data-correct>Leave the scope — <code>return</code>, <code>break</code>, <code>continue</code>, or <code>panic!</code></button>
+    <button class="quiz-opt">Assign a default value to <code>path</code></button>
+    <button class="quiz-opt">Nothing — it can be empty</button>
+    <p class="quiz-fb ok" hidden>Right — if the pattern doesn't match there is no <code>path</code> to bind, so the <code>else</code> must diverge. After a successful <code>let else</code>, the binding stays in scope.</p>
+    <p class="quiz-fb no" hidden>There's no value to bind when the pattern fails, so the <code>else</code> can't fall through — it must diverge (<code>return</code>/<code>break</code>/<code>continue</code>/<code>panic!</code>).</p>
+  </div>
+
+  <h2>Primary sources</h2>
+  <p>The canonical treatment is <a href="https://doc.rust-lang.org/book/ch06-00-enums.html"><strong>The Rust Book, Ch. 6 — "Enums and Pattern Matching"</strong></a> for <code>match</code> and <code>if let</code>, and <a href="https://doc.rust-lang.org/book/ch19-00-patterns.html"><strong>Ch. 19 — "Patterns and Matching"</strong></a> for the full pattern grammar (guards, bindings, ranges, and where each pattern is allowed). <code>let else</code> is documented in <a href="https://doc.rust-lang.org/reference/statements.html#let-statements"><strong>The Reference — "let statements."</strong></a></p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If a <code>match</code> won't compile, paste the error — the non-exhaustive and unreachable-arm messages are very precise. Next: <strong>Lesson 8 takes on strings and slices</strong> — <code>&amp;str</code> vs <code>String</code>, how slicing works, and why a byte index can land in the middle of a UTF-8 character.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0006-structs-enums.html">◂ Lesson 6: Structs &amp; enums</a>
+      <a href="https://doc.rust-lang.org/book/ch06-00-enums.html">📘 Book Ch. 6 &amp; 19</a>
+      <span>Next ▸ Lesson 8: Strings &amp; slices</span>
+    </div>
+  </div>
+</div>
