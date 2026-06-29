@@ -36,7 +36,7 @@
 pub struct Counts {
     pub lines: usize,
     pub words: usize,
-    pub chars: usize,
+    pub bytes: usize,
 }
 
 impl Counts {
@@ -44,7 +44,7 @@ impl Counts {
         Counts {
             lines: text.lines().count(),
             words: text.split_whitespace().count(),
-            chars: text.chars().count(),
+            bytes: text.len(),
         }
     }
 
@@ -58,7 +58,7 @@ impl Counts {
     <pre><code>    pub fn add(&amp;mut self, other: Counts) {
         self.lines += other.lines;
         self.words += other.words;
-        self.chars += other.chars;
+        self.bytes += other.bytes;
     }</code></pre>
   </details>
   <p>Every piece, explained:</p>
@@ -66,7 +66,7 @@ impl Counts {
     <li><strong><code>pub struct Counts { pub lines: usize, ... }</code></strong> — A <code>struct</code> defines a new type made of named fields. <code>Counts</code> bundles the three tallies into one value where <code>c.lines</code> says what <code>c.0</code> never could. <code>pub</code> on the struct makes the type visible outside the library; <code>pub</code> on each field makes that field readable and writable from outside too (without it, the fields would be private to the library — fine for many designs, but here the binary needs to read them to print).</li>
     <li><strong><code>#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]</code></strong> — An <em>attribute</em> that asks the compiler to generate standard trait implementations so you don't write them by hand. <code>Debug</code> enables <code>{:?}</code> formatting (handy in tests and <code>dbg!</code>); <code>Default</code> gives <code>Counts::default()</code> — every field set to its own default, i.e. <code>0</code> — which is our zero-initialised total; <code>Clone</code> + <code>Copy</code> make <code>Counts</code> behave like the tuple did (cheap bit-for-bit duplication, no moves to worry about, because it is just three integers); <code>PartialEq</code> + <code>Eq</code> let you compare two <code>Counts</code> with <code>==</code> and use <code>assert_eq!</code> on them.</li>
     <li><strong><code>impl Counts { ... }</code></strong> — An <em>implementation block</em>: where a type's methods and associated functions live. Everything inside is attached to <code>Counts</code>.</li>
-    <li><strong><code>pub fn from_text(text: &amp;str) -&gt; Counts</code></strong> — An <em>associated function</em> (no <code>self</code> parameter), called as <code>Counts::from_text(...)</code>. It is the old <code>counts()</code> function, now returning a named <code>Counts</code> by writing each field. The struct-literal syntax <code>Counts { lines: ..., words: ..., chars: ... }</code> constructs a value by naming every field.</li>
+    <li><strong><code>pub fn from_text(text: &amp;str) -&gt; Counts</code></strong> — An <em>associated function</em> (no <code>self</code> parameter), called as <code>Counts::from_text(...)</code>. It is the old <code>counts()</code> function, now returning a named <code>Counts</code> by writing each field — with one change from the tuple: the third count is now <strong>bytes</strong> (<code>text.len()</code>), what <code>wc</code> reports by default, rather than characters. The two are identical for ASCII and differ only on multi-byte UTF-8, which the Unicode test in Step 5 checks. The struct-literal syntax <code>Counts { lines: ..., words: ..., bytes: ... }</code> constructs a value by naming every field.</li>
     <li><strong><code>pub fn add(&amp;mut self, other: Counts)</code></strong> — A <em>method</em>: the <code>&amp;mut self</code> first parameter means it borrows the receiver mutably, so <code>total.add(c)</code> updates <code>total</code> in place. This replaces the free-standing <code>add_into(&amp;mut total, c)</code> from Lesson 4 — same mutable-borrow idea, now written as <code>total.add(c)</code>, which reads better and keeps the behaviour next to the data. <code>self</code> is just Rust's <code>this</code>; <code>&amp;mut self</code> is shorthand for <code>self: &amp;mut Counts</code>.</li>
   </ul>
   <p>The binary won't compile against this yet — we rewire <code>main</code> in Step 3. First, the input side.</p>
@@ -138,7 +138,7 @@ impl Counts {
     <span class="label">Concept · struct vs enum</span>
     <p>Both define new types; the difference is "and" versus "or":</p>
     <ul>
-      <li>A <strong><code>struct</code></strong> is a record of fields held <em>together</em> — a <code>Counts</code> has lines <strong>and</strong> words <strong>and</strong> chars, all at once. (A "product type".)</li>
+      <li>A <strong><code>struct</code></strong> is a record of fields held <em>together</em> — a <code>Counts</code> has lines <strong>and</strong> words <strong>and</strong> bytes, all at once. (A "product type".)</li>
       <li>An <strong><code>enum</code></strong> is a choice between variants held <em>one at a time</em> — a <code>Source</code> is <code>Stdin</code> <strong>or</strong> <code>File</code>, never both. (A "sum type".) Variants may carry their own data of different shapes.</li>
     </ul>
     <p>You have already been using enums: <code>Option&lt;T&gt;</code> (<code>Some</code>/<code>None</code>) and <code>Result&lt;T, E&gt;</code> (<code>Ok</code>/<code>Err</code>) are both enums from the standard library. Defining <code>Source</code> is the same machinery, now in your own code.</p>
@@ -158,12 +158,12 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 <span class="add">    for source in &amp;sources {</span>
 <span class="add">        let text = source.read().map_err(|e| format!("{}: {}", source.name(), e))?;</span>
 <span class="add">        let c = Counts::from_text(&amp;text);</span>
-<span class="add">        println!("{:&gt;6} {:&gt;6} {:&gt;6} {}", c.lines, c.words, c.chars, source.name());</span>
+<span class="add">        println!("{:&gt;6} {:&gt;6} {:&gt;6} {}", c.lines, c.words, c.bytes, source.name());</span>
 <span class="add">        total.add(c);</span>
 <span class="add">    }</span>
 
 <span class="add">    if sources.len() &gt; 1 {</span>
-<span class="add">        println!("{:&gt;6} {:&gt;6} {:&gt;6} total", total.lines, total.words, total.chars);</span>
+<span class="add">        println!("{:&gt;6} {:&gt;6} {:&gt;6} total", total.lines, total.words, total.bytes);</span>
 <span class="add">    }</span>
     Ok(())
 }</code></pre>
@@ -180,7 +180,7 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
   <h2>Step 4 — Document the library with doc-tests</h2>
   <p>This is the testing topic flagged back in Lesson 3. A <strong>doc-test</strong> is an example written inside a <code>///</code> documentation comment, fenced in triple-backticks. <code>cargo test</code> compiles and <em>runs</em> each one — so your documentation can never silently drift out of date with the code. The catch noted in Lesson 3: <strong>doc-tests run only for library crates.</strong> That is precisely why we created <code>src/lib.rs</code> in this lesson — the examples below would be invisible to <code>cargo test</code> if this logic had stayed in <code>main.rs</code>.</p>
   <p>Add <code>///</code> comments with examples above the items in <code>src/lib.rs</code>. Here is <code>Counts</code> and its two methods, doc-comments highlighted:</p>
-  <pre><code><span class="add">/// A tally of lines, words, and characters for one piece of text.</span>
+  <pre><code><span class="add">/// A tally of lines, words, and bytes for one piece of text.</span>
 <span class="add">///</span>
 <span class="add">/// ```</span>
 <span class="add">/// use rwc::Counts;</span>
@@ -188,17 +188,17 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 <span class="add">/// let c = Counts::from_text("hello world\nbye\n");</span>
 <span class="add">/// assert_eq!(c.lines, 2);</span>
 <span class="add">/// assert_eq!(c.words, 3);</span>
-<span class="add">/// assert_eq!(c.chars, 16);</span>
+<span class="add">/// assert_eq!(c.bytes, 16);</span>
 <span class="add">/// ```</span>
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Counts {
     pub lines: usize,
     pub words: usize,
-    pub chars: usize,
+    pub bytes: usize,
 }
 
 impl Counts {
-<span class="add">    /// Count the lines, words, and characters in `text`.</span>
+<span class="add">    /// Count the lines, words, and bytes in `text`.</span>
 <span class="add">    ///</span>
 <span class="add">    /// ```</span>
 <span class="add">    /// # use rwc::Counts;</span>
@@ -293,7 +293,7 @@ mod tests {
 <span class="add">        let c = Counts::from_text("hello world\nthis is a test");</span>
 <span class="add">        assert_eq!(c.lines, 2);</span>
 <span class="add">        assert_eq!(c.words, 6);</span>
-<span class="add">        assert_eq!(c.chars, 26);</span>
+<span class="add">        assert_eq!(c.bytes, 26);</span>
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(sources[1].name(), "y");
     }</code></pre>
   </details>
-  <p>(The Unicode test from Lesson 3 carries over too, reworded to read <code>c.chars</code> instead of the tuple's <code>.2</code>.) The <code>counts_empty</code> test now leans on the derived traits: <code>Counts::default()</code> is the all-zero value and <code>==</code> works because we derived <code>PartialEq</code>. Run the full suite:</p>
+  <p>(The Unicode test from Lesson 3 carries over too, now reading <code>c.bytes</code>; on the multi-byte Tamil sample it asserts the byte count exceeds the character count — the difference that makes bytes-versus-characters matter.) The <code>counts_empty</code> test now leans on the derived traits: <code>Counts::default()</code> is the all-zero value and <code>==</code> works because we derived <code>PartialEq</code>. Run the full suite:</p>
   <pre class="shell"><code>cargo test</code></pre>
   <pre class="shell"><code>     Running unittests src/lib.rs
 
