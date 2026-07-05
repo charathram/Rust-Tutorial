@@ -1,0 +1,18 @@
+// Zed tasks for the Rust-Tutorial workspace.
+// Run with: cmd-shift-p → "task: spawn", or bind a key to `task::Spawn`.
+[
+  {
+    "label": "Serve Docs",
+    // `live-server` is the cargo-installed binary (~/.cargo/bin/live-server).
+    // ROOT defaults to ".", so setting cwd to the workspace root serves the
+    // whole tree (lessons/, reference/, assets/, …) with live reload.
+    "command": "~/.cargo/bin/live-server",
+    // --index: browsable listing at "/" (there's no root index.html).
+    // --open: jump straight to the syllabus, the course entry point.
+    "args": ["--open=lessons/000-syllabus.html"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+  },
+]
