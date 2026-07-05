@@ -3,3 +3,6 @@ target/
 
 # macOS
 .DS_Store
+
+# demo fixtures created while working through lessons
+*.txt
