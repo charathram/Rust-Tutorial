@@ -1,0 +1,299 @@
+<meta charset="utf-8">
+<title>Lesson 8 — Strings &amp; slices: String vs &amp;str</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 8 · Build-along</p>
+  <h1>Strings &amp; slices: <code>String</code> vs <code>&amp;str</code></h1>
+  <p class="subtitle">You have used <code>String</code> and <code>&amp;str</code> since Lesson 1 without naming the difference. Now learn what a Rust string actually is — UTF-8 bytes — and teach <code>rwc</code> to count <em>characters</em> as well as bytes. Along the way: owned vs borrowed text, how slicing works, and why a byte index can land in the middle of a character.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Tell <code>String</code> (owned) from <code>&amp;str</code> (a borrowed view), and choose between them deliberately.</li>
+    <li>Explain that a <code>&amp;str</code> is UTF-8 bytes: <code>.len()</code> counts bytes, <code>.chars().count()</code> counts characters.</li>
+    <li>Slice a string with <code>&amp;s[a..b]</code>, know it yields a <code>&amp;str</code>, and know why an off-boundary index panics.</li>
+    <li>Add a character count to <code>rwc</code> alongside its byte count.</li>
+    <li>Write a function that returns a borrowed slice safely.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0008-rwc/</code>, a clean copy of your finished Lesson 7 tool — the <code>Counts</code> struct and <code>Source</code> enum, tests green. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write — attempt it, then open <em>Show solution</em> to check.
+  </div>
+
+  <h2>Why strings, why now</h2>
+  <p><code>rwc</code> already moves between two string types on every run. <code>Source::read</code> hands back a <code>String</code> — the whole file, owned. <code>Counts::from_text</code> takes a <code>&amp;str</code> — it only reads the text, so it borrows instead of copying. You wrote both signatures in Lesson 6 and they just worked; this lesson explains the distinction so you can make it on purpose.</p>
+  <p>There is also unfinished business. Lesson 6 had <code>rwc</code> count <em>bytes</em> (<code>text.len()</code>). On the ASCII test files that looked like a character count — but it isn't, and the moment a file holds an accented letter or any non-Latin script the two numbers part ways. Real <code>wc</code> draws the same line: <code>-c</code> counts bytes, <code>-m</code> counts characters. This lesson explains why they differ and adds a real character count, so <code>rwc</code> reports both.</p>
+
+  <h2>Step 1 — <code>String</code> vs <code>&amp;str</code>: owned vs borrowed</h2>
+  <p>Two types, one job — holding text — but they sit on opposite sides of ownership:</p>
+  <div class="compare">
+    <span class="label">The pair</span>
+    <p><strong><code>String</code></strong> — an <em>owned</em>, growable, heap-allocated buffer of UTF-8 bytes. It can be appended to, it owns its memory, and it frees that memory when it drops. This is what you get from <code>fs::read_to_string</code> or <code>format!</code>.</p>
+    <p><strong><code>&amp;str</code></strong> (a "string slice") — a <em>borrowed view</em> into UTF-8 text someone else owns: under the hood just a pointer and a length. It allocates nothing and owns nothing. A string literal like <code>"-"</code> is a <code>&amp;str</code> (it borrows from the program binary); so is <code>&amp;some_string</code>.</p>
+  </div>
+  <p>It is the same owned-vs-borrowed split you learned for references in Lesson 4, specialized to text. And you can see it already in <code>rwc</code>'s own signatures:</p>
+  <ul>
+    <li><code>fn read(&amp;self) -&gt; io::Result&lt;String&gt;</code> — returns an owned <code>String</code>, because the file's contents must live on after the call.</li>
+    <li><code>fn from_text(text: &amp;str) -&gt; Counts</code> — borrows the text; it counts and returns, never needing to own a copy.</li>
+    <li><code>fn name(&amp;self) -&gt; &amp;str</code> — returns a slice borrowed <em>out of</em> <code>self</code>: no new string, just a view into the path already stored in the <code>Source</code>.</li>
+    <li><code>fn describe(&amp;self) -&gt; String</code> — returns an owned <code>String</code>, because it <em>builds</em> new text with <code>format!</code> that nothing else owns.</li>
+  </ul>
+  <p>The rule of thumb that follows:</p>
+  <ul>
+    <li><strong>Take <code>&amp;str</code> as a parameter.</strong> A caller holding a <code>String</code> passes <code>&amp;s</code>; a caller with a literal passes it directly. That is why <code>from_text(&amp;text)</code> works even though <code>text</code> is a <code>String</code> — a <code>&amp;String</code> coerces to <code>&amp;str</code>. One parameter type accepts both.</li>
+    <li><strong>Return <code>&amp;str</code></strong> when handing back a view into data the caller already owns (like <code>name</code>), and <strong>return <code>String</code></strong> when you produce new text (like <code>describe</code>).</li>
+  </ul>
+
+  <h2>Step 2 — A <code>&amp;str</code> is bytes, not characters</h2>
+  <p>Here is the fact that everything else in this lesson rests on: a Rust string is a sequence of <strong>UTF-8 bytes</strong>, and <code>.len()</code> reports the number of <em>bytes</em>, not characters. For plain ASCII every character is one byte, so the two numbers are equal — which is exactly why Lesson 6's byte count looked like a character count on the ASCII fixtures. But UTF-8 encodes most of the world's characters in two to four bytes:</p>
+  <pre><code>let s = "café";
+s.len();             <span class="c">// 5  — bytes ('é' is encoded as two)</span>
+s.chars().count();   <span class="c">// 4  — characters (Unicode scalar values)</span></code></pre>
+  <p>Laid out byte by byte, the mismatch is concrete:</p>
+  <pre class="shell"><code>"café"   c     a     f     é
+bytes:  0x63  0x61  0x66  0xc3 0xa9     ← 5 bytes; 'é' takes two
+chars:   1     2     3      4           ← 4 characters</code></pre>
+  <p><code>.len()</code> walks the raw bytes; <code>.chars()</code> decodes them back into <code>char</code>s (Unicode <em>scalar values</em>) and <code>.count()</code> tallies those. That is the whole of <code>wc</code>'s <code>-c</code> (bytes) versus <code>-m</code> (characters) distinction — and the reason <code>rwc</code> should report both.</p>
+
+  <h2>Step 3 — Add the character count</h2>
+  <p>Give <code>Counts</code> a fourth field. First the struct — add <code>chars</code> next to <code>bytes</code>:</p>
+  <pre><code>pub struct Counts {
+    pub lines: usize,
+    pub words: usize,
+    pub bytes: usize,
+<span class="add">    pub chars: usize,</span>
+}</code></pre>
+  <p>Now the two places that compute counts. The <code>bytes</code> line in each is your worked example — the <code>chars</code> line sits right beside it and uses <code>.chars().count()</code> instead of <code>.len()</code>.</p>
+  <p><strong>Your turn</strong> — fill the <code>chars</code> line in <code>from_text</code>:</p>
+  <pre><code>    pub fn from_text(text: &amp;str) -&gt; Counts {
+        Counts {
+            lines: text.lines().count(),
+            words: text.split_whitespace().count(),
+            bytes: text.len(),
+<span class="add">            <span class="todo">// TODO (your turn): count characters, not bytes</span></span>
+        }
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>            bytes: text.len(),
+            chars: text.chars().count(),</code></pre>
+  </details>
+  <p><strong>Your turn</strong> — and accumulate it in <code>add</code>, mirroring the <code>bytes</code> line:</p>
+  <pre><code>    pub fn add(&amp;mut self, other: Counts) {
+        self.lines += other.lines;
+        self.words += other.words;
+        self.bytes += other.bytes;
+<span class="add">        <span class="todo">// TODO (your turn): accumulate chars too</span></span>
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>        self.bytes += other.bytes;
+        self.chars += other.chars;</code></pre>
+  </details>
+  <p>Finally, keep the documentation honest. Add a <code>chars</code> assertion to each <code>Counts</code> doc-test — the same single line after the <code>bytes</code> assert, in the <code>Counts</code>, <code>from_text</code>, and <code>add</code> doc-tests alike. On an ASCII example the two numbers match, which is the point:</p>
+  <pre><code>    /// assert_eq!(counts.bytes, 26);
+<span class="add">    /// assert_eq!(counts.chars, 26);</span></code></pre>
+  <p>And widen <code>from_text</code>'s summary so the new field is documented, with a note on how bytes and characters relate (the first line changes; the rest is new):</p>
+  <pre><code><span class="add">    /// Counts the number of lines, words, bytes, and characters in the given text.</span>
+<span class="add">    ///</span>
+<span class="add">    /// `bytes` is the UTF-8 length; `chars` is the number of Unicode scalar</span>
+<span class="add">    /// values. They are equal for ASCII and differ once the text contains any</span>
+<span class="add">    /// multi-byte character.</span>
+    ///
+    /// ```
+    <span class="c">/// ... the existing example, now also asserting `counts.chars` ...</span>
+    /// ```
+    pub fn from_text(text: &amp;str) -&gt; Counts {</code></pre>
+  <p>(The vivid case — bytes exceeding chars — is pinned by a unit test and a <code>first_chars</code> doc-test in the steps below.) Run <code>cargo test</code> now and it still passes. Adding a field to a struct is <em>backward-compatible</em>: code that builds a <code>Counts</code> through <code>from_text</code> and reads named fields keeps working, and <code>Counts::default()</code> fills the new field with <code>0</code>. This is the opposite of Lesson 7, where adding an enum <em>variant</em> broke every <code>match</code> — so nothing forces <code>main.rs</code> to show the new column. You wire that in deliberately, in Step 5.</p>
+
+  <h2>Step 4 — Slicing and UTF-8 boundaries</h2>
+  <p>A <em>slice expression</em> <code>&amp;s[start..end]</code> produces a <code>&amp;str</code> that borrows the bytes from <code>start</code> up to (not including) <code>end</code>. The indices are <strong>byte</strong> offsets, and the slice must begin and end on a character boundary. Land inside a multi-byte character and it is not a compile error — it panics at runtime:</p>
+  <pre><code>fn main() {
+    let s = "café";
+    let good = &amp;s[0..3]; <span class="c">// "caf" — ends on a boundary</span>
+    let bad = &amp;s[0..4];  <span class="c">// byte 4 lands inside 'é'</span>
+    println!("{good} {bad}");
+}</code></pre>
+  <pre class="shell"><code>thread 'main' panicked at src/main.rs:4:17:
+end byte index 4 is not a char boundary; it is inside 'é' (bytes 3..5 of string)</code></pre>
+  <p>The message is precise: byte 4 is the second byte of <code>é</code> (which occupies bytes 3 and 4), so it is not a place a <code>&amp;str</code> may start or stop. Two safe ways to avoid the panic:</p>
+  <ul>
+    <li><strong><code>s.get(start..end)</code></strong> returns <code>Option&lt;&amp;str&gt;</code> — <code>None</code> instead of a panic when the range is off-boundary. <code>s.get(0..4)</code> is <code>None</code>; <code>s.get(0..3)</code> is <code>Some("caf")</code>.</li>
+    <li><strong>Count by characters, not bytes.</strong> <code>char_indices()</code> yields each character paired with the byte offset where it begins — always a valid boundary:</li>
+  </ul>
+  <pre><code>for (i, c) in "café".char_indices() {
+    println!("{i}: {c}");
+}
+<span class="c">// 0: c</span>
+<span class="c">// 1: a</span>
+<span class="c">// 2: f</span>
+<span class="c">// 3: é</span></code></pre>
+  <p>Use that to take the first <em>n</em> characters safely. <code>char_indices().nth(n)</code> gives the byte offset where character <em>n</em> begins (the first index <em>past</em> the <em>n</em> you want); slice up to there. If the string has fewer than <em>n</em> characters there is no such offset, so return the whole thing.</p>
+  <p><strong>Your turn</strong> — add a free function <code>first_chars</code> to <code>lib.rs</code> (top level, near <code>Counts</code>). It returns a borrowed slice, so its signature borrows the input and hands a view back out:</p>
+  <pre><code>    /// Returns the first `n` characters of `s` as a borrowed `&amp;str`.
+    /// Counting is by character, so the slice always ends on a boundary and
+    /// never panics. Fewer than `n` characters returns the whole string.
+    ///
+    /// ```
+    /// use rwc::first_chars;
+    /// assert_eq!(first_chars("hello", 2), "he");
+    /// assert_eq!(first_chars("café", 4), "café"); // 4 chars, 5 bytes — no panic
+    /// assert_eq!(first_chars("hi", 5), "hi");     // fewer than n chars → all of it
+    /// ```
+    pub fn first_chars(s: &amp;str, n: usize) -&gt; &amp;str {
+        <span class="todo">// TODO (your turn): find the byte offset of character n with</span>
+        <span class="todo">// TODO (your turn): char_indices().nth(n); slice up to it, else return s</span>
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn first_chars(s: &amp;str, n: usize) -&gt; &amp;str {
+        match s.char_indices().nth(n) {
+            Some((idx, _)) =&gt; &amp;s[..idx],
+            None =&gt; s,
+        }
+    }</code></pre>
+  </details>
+  <p>Notice what the signature says: <code>first_chars</code> takes a <code>&amp;str</code> and returns a <code>&amp;str</code> that points <em>into</em> it. The returned slice borrows from <code>s</code>, so it cannot outlive it — the same borrowing rule from Lesson 4, now spanning a function boundary. Making that relationship explicit (with a <em>lifetime</em>) is exactly what Lesson 9 is about; for now the compiler infers it.</p>
+
+  <h2>Step 5 — Show the count, then test and run</h2>
+  <p>Now surface the new field. In <code>main.rs</code>, add a <code>chars</code> column to both the per-source line and the total — a new <code>{:&gt;6}</code> slot and the value to fill it:</p>
+  <pre><code>        println!(
+<span class="add">            "{:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} {}",</span>
+            counts.lines,
+            counts.words,
+            counts.bytes,
+<span class="add">            counts.chars,</span>
+            source.describe()
+        );</code></pre>
+  <pre><code>    if sources.len() &gt; 1 {
+        println!(
+<span class="add">            "{:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} total",</span>
+<span class="add">            total.lines, total.words, total.bytes, total.chars</span>
+        );
+    }</code></pre>
+  <p>Real <code>wc</code> would show one or the other depending on <code>-c</code> / <code>-m</code>; <code>rwc</code> has no flags yet (those arrive with <code>clap</code> in Lesson 11), so for now it prints both columns side by side — which makes the byte/character gap visible at a glance.</p>
+  <p>Next, harden the tests. Point the existing Unicode test at <code>café</code> so both numbers are pinned, and add one for <code>first_chars</code>.</p>
+  <p><strong>Your turn</strong> — the assertions mirror the worked example from the doc-tests:</p>
+  <pre><code>    #[test]
+    fn counts_unicode() {
+        let c = Counts::from_text("café");
+        assert_eq!(c.lines, 1);
+        assert_eq!(c.words, 1);
+<span class="add">        <span class="todo">// TODO (your turn): assert bytes is 5 and chars is 4</span></span>
+    }
+
+    #[test]
+<span class="add">    fn first_chars_respects_boundaries() {</span>
+<span class="add">        <span class="todo">// TODO (your turn): first 3 of "café" is "caf"; first 99 is all of it</span></span>
+<span class="add">    }</span></code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    #[test]
+    fn counts_unicode() {
+        let c = Counts::from_text("café");
+        assert_eq!(c.lines, 1);
+        assert_eq!(c.words, 1);
+        assert_eq!(c.bytes, 5);
+        assert_eq!(c.chars, 4);
+    }
+
+    #[test]
+    fn first_chars_respects_boundaries() {
+        assert_eq!(first_chars("café", 3), "caf");
+        assert_eq!(first_chars("café", 4), "café");
+        assert_eq!(first_chars("café", 99), "café");
+    }</code></pre>
+  </details>
+  <p>Run the suite. The unit tests join the Lesson 7 ones, and the doc-tests gain <code>first_chars</code> (whose example exercises a multi-byte <code>café</code>):</p>
+  <pre class="shell"><code>cargo test</code></pre>
+  <pre class="shell"><code>running 9 tests
+test tests::counts_ascii ... ok
+test tests::counts_unicode ... ok
+test tests::counts_empty ... ok
+test tests::first_chars_respects_boundaries ... ok
+test tests::from_args_empty_defaults_to_stdin ... ok
+test tests::from_args_map_paths_to_files ... ok
+test tests::add_accumulates_counts ... ok
+test tests::from_args_dash_is_stdin ... ok
+test tests::from_args_rejects_unknown_flag ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; ...
+
+   Doc-tests rwc
+
+running 10 tests
+test result: ok. 10 passed; 0 failed; 0 ignored; ...</code></pre>
+  <p>Finally, see the two counts diverge on real input. An ASCII file first, where bytes and chars match:</p>
+  <pre class="shell"><code>printf 'a b c\n' &gt; demo.txt
+cargo run -- demo.txt</code></pre>
+  <pre class="shell"><code>     1      3      6      6 demo.txt</code></pre>
+  <p>Then a file with accented letters, where they don't — and the totals add up per column:</p>
+  <pre class="shell"><code>printf 'café\nrésumé\n' &gt; unicode.txt
+cargo run -- demo.txt unicode.txt</code></pre>
+  <pre class="shell"><code>     1      3      6      6 demo.txt
+     2      2     15     12 unicode.txt
+     3      5     21     18 total</code></pre>
+  <p><code>unicode.txt</code> is 15 bytes but only 12 characters — the three accented <code>é</code>s cost an extra byte each. That gap is the whole point of the lesson, now visible in the output.</p>
+
+  <div class="win">
+    <span class="label">Outcome</span>
+    <code>rwc</code> now counts characters as well as bytes, and you can say exactly why those numbers differ. You learned that a Rust string is UTF-8 bytes, that <code>String</code> owns while <code>&amp;str</code> borrows, that slicing works on byte offsets and must respect character boundaries, and you wrote a function that safely returns a borrowed slice — the borrow that Lesson 9 will name with a lifetime.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>Graphemes vs scalar values.</strong> Even <code>chars().count()</code> isn't the "visible characters" a human sees: <code>"e\u{301}"</code> (an <code>e</code> plus a combining accent) is one grapheme but two <code>char</code>s. Add the <a href="https://crates.io/crates/unicode-segmentation"><code>unicode-segmentation</code></a> crate and compare <code>graphemes(true).count()</code> with <code>chars().count()</code> on such a string.</li>
+    <li><strong>A non-panicking slice.</strong> Write <code>safe_slice(s: &amp;str, a: usize, b: usize) -&gt; Option&lt;&amp;str&gt;</code> that wraps <code>s.get(a..b)</code>, and a test proving an off-boundary range yields <code>None</code> rather than panicking.</li>
+    <li><strong>Preview long names.</strong> Use <code>first_chars</code> to truncate any source label longer than, say, 20 characters to <code>first_chars(name, 20)</code> plus an ellipsis — proving the helper handles a multi-byte label without splitting a character.</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">What does <code>"café".len()</code> return?</p>
+    <button class="quiz-opt" data-correct><code>5</code> — the number of UTF-8 <em>bytes</em></button>
+    <button class="quiz-opt"><code>4</code> — the number of characters</button>
+    <button class="quiz-opt"><code>3</code> — the ASCII characters only</button>
+    <p class="quiz-fb ok" hidden>Right — <code>.len()</code> is the byte length, and <code>é</code> encodes as two bytes, so <code>"café"</code> is 5 bytes. For the character count (4) you'd use <code>.chars().count()</code>.</p>
+    <p class="quiz-fb no" hidden><code>.len()</code> reports <em>bytes</em>, not characters. <code>é</code> takes two UTF-8 bytes, so <code>"café"</code> is 5 bytes; <code>.chars().count()</code> would give 4.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q"><code>&amp;s[0..4]</code> where <code>s = "café"</code> and byte 4 is inside <code>é</code> — what happens?</p>
+    <button class="quiz-opt" data-correct>It panics at runtime: the index isn't a character boundary</button>
+    <button class="quiz-opt">It fails to compile</button>
+    <button class="quiz-opt">It silently returns <code>"caf"</code>, rounding down to a boundary</button>
+    <p class="quiz-fb ok" hidden>Right — slice indices are byte offsets that must fall on character boundaries; an off-boundary index is a runtime panic, not a compile error. Use <code>s.get(0..4)</code> for an <code>Option</code> instead.</p>
+    <p class="quiz-fb no" hidden>It compiles fine — the index is only checked at runtime, where landing inside <code>é</code> panics. It never rounds; for a non-panicking version use <code>s.get(0..4)</code>, which returns <code>None</code>.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">A function builds a brand-new label with <code>format!</code> and returns it. What type should it return?</p>
+    <button class="quiz-opt" data-correct><code>String</code> — it owns text it just created</button>
+    <button class="quiz-opt"><code>&amp;str</code> — strings are always borrowed</button>
+    <button class="quiz-opt">Either works identically</button>
+    <p class="quiz-fb ok" hidden>Right — the new text isn't owned by anyone else, so the function must own and return it as a <code>String</code>. You return <code>&amp;str</code> only when handing back a view into data that already exists (like <code>name</code>).</p>
+    <p class="quiz-fb no" hidden>Newly built text has no other owner to borrow from, so a <code>&amp;str</code> would dangle. Return <code>String</code> when you create text; return <code>&amp;str</code> only for a view into existing data.</p>
+  </div>
+
+  <h2>Primary sources</h2>
+  <p>The canonical treatment is <a href="https://doc.rust-lang.org/book/ch08-02-strings.html"><strong>The Rust Book, Ch. 8.2 — "Storing UTF-8 Encoded Text with Strings"</strong></a>, which covers <code>String</code> vs <code>&amp;str</code>, why you cannot index a string by integer, and how byte/char/grapheme views differ. Slices in general are <a href="https://doc.rust-lang.org/book/ch04-03-slices.html"><strong>Ch. 4.3 — "The Slice Type."</strong></a> For the exact methods, the <a href="https://doc.rust-lang.org/std/primitive.str.html"><strong><code>str</code> primitive docs</strong></a> list <code>len</code>, <code>chars</code>, <code>char_indices</code>, and <code>get</code>.</p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If a slice panics, paste the message — it names the exact byte and the character it split. Next: <strong>Lesson 9 takes on lifetimes</strong> — the <code>'a</code> annotation that makes the borrow in <code>first_chars</code> (and a struct that holds a <code>&amp;str</code>) explicit and checkable.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0007-pattern-matching.html">◂ Lesson 7: Pattern matching</a>
+      <a href="https://doc.rust-lang.org/book/ch08-02-strings.html">📘 Book Ch. 8.2 &amp; 4.3</a>
+      <span>Next ▸ Lesson 9: Lifetimes</span>
+    </div>
+  </div>
+</div>
