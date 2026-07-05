@@ -1,0 +1,315 @@
+<meta charset="utf-8">
+<title>Lesson 10 — Cargo, crates &amp; dependencies</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 10 · Build-along</p>
+  <h1>Cargo, crates &amp; dependencies</h1>
+  <p class="subtitle">Every line of <code>rwc</code> so far has used only the standard library. That ends here. This lesson adds <code>rwc</code>'s first external <em>dependency</em> — a crate from <a href="https://crates.io">crates.io</a> — and puts it to work counting a fifth column: <strong>graphemes</strong>, the user-perceived characters. The choice is deliberate. The standard library has no grapheme segmentation, on purpose: doing it correctly means shipping large Unicode tables the std team leaves to a dedicated crate. That is exactly what dependencies are for. Along the way you learn the machinery every real Rust project leans on — <code>cargo add</code>, the <code>[dependencies]</code> table, semver version requirements, the <code>Cargo.lock</code> lockfile, and pinning the compiler with <code>rust-toolchain.toml</code> so a build reproduces on any machine.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Add an external crate with <code>cargo add</code> and read the <code>[dependencies]</code> entry it writes.</li>
+    <li>Read a semver requirement (<code>"1.13.3"</code> is the caret req <code>^1.13.3</code>) and say which versions it allows — including the special <code>0.x</code> rule.</li>
+    <li>Explain what <code>Cargo.lock</code> pins (an exact version plus a checksum), why you commit it, and what <code>cargo update</code> does.</li>
+    <li>Pin the compiler with <code>rust-toolchain.toml</code> and say why that, together with the lockfile, makes a build reproducible.</li>
+    <li>Bring an external trait into scope (<code>UnicodeSegmentation</code>) to call its method — the same "trait must be in scope" rule you met with <code>Read</code>.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0010-rwc/</code>, a clean copy of your finished Lesson 9 tool — <code>Counts</code> with its four fields, <code>Report&lt;'a&gt;</code>, and the <code>Source</code> enum, tests green, and an <em>empty</em> <code>[dependencies]</code> table. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write — attempt it, then open <em>Show solution</em> to check.
+  </div>
+
+  <h2>Why a dependency, why now</h2>
+  <p>In Lesson 8 you added a <code>chars</code> count with one line of std: <code>text.chars().count()</code>. That counts Unicode <em>scalar values</em> — <code>char</code>s. But a <code>char</code> is not always a whole user-visible character. Write "é" as the base letter <code>e</code> followed by a combining acute accent (<code>U+0301</code>) and that is <em>two</em> <code>char</code>s but <em>one</em> thing a reader sees — one <strong>grapheme cluster</strong>. Emoji made of joined parts (a family, a flag, a skin-tone modifier) are many <code>char</code>s and one grapheme too.</p>
+  <p>Counting graphemes correctly is not a one-liner. It needs the Unicode text-segmentation algorithm and the data tables behind it — thousands of entries that change with each Unicode release. The standard library deliberately does <em>not</em> ship this; <code>str</code> has no <code>.graphemes()</code> method. The Rust project maintains it as a separate crate, <a href="https://crates.io/crates/unicode-segmentation"><code>unicode-segmentation</code></a>, so you pull in exactly that capability without the std team owning it forever. Reaching for a crate here is the right call, not a shortcut — and it is the perfect first dependency because the "why" is concrete: std can't do this, and a well-maintained crate can.</p>
+
+  <h2>Step 1 — Add the crate with <code>cargo add</code></h2>
+  <p>A <strong>crate</strong> is a Rust package — a unit of code published to the registry <a href="https://crates.io">crates.io</a> and reusable by name. A <strong>dependency</strong> is a crate your project builds on. You declare dependencies in <code>Cargo.toml</code>, under the <code>[dependencies]</code> table. The easy way to add one is <code>cargo add</code>, which looks up the latest version and writes the entry for you:</p>
+  <pre class="shell"><code>cargo add unicode-segmentation</code></pre>
+  <pre class="shell"><code>    Updating crates.io index
+      Adding unicode-segmentation v1.13.3 to dependencies
+             Features:
+             - no_std
+    Updating crates.io index
+     Locking 1 package to latest Rust 1.96.0 compatible version
+      Adding unicode-segmentation v1.13.3</code></pre>
+  <p>Two things happened. First, <code>Cargo.toml</code> grew a line under <code>[dependencies]</code>:</p>
+  <pre><code>[package]
+name = "rwc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+<span class="add">unicode-segmentation = "1.13.3"</span></code></pre>
+  <p>(The <em>Features</em> note lists optional parts of the crate you can switch on — <code>unicode-segmentation</code> offers a <code>no_std</code> feature for environments without the standard library. You need none of them here; the defaults are what you want.)</p>
+  <p>Second, Cargo <em>resolved</em> and <em>locked</em> the version — "Locking 1 package." That is the <code>Cargo.lock</code> file, the subject of Step 3. First, what does <code>"1.13.3"</code> actually mean?</p>
+
+  <h2>Step 2 — Semver: what a version requirement allows</h2>
+  <p>Crates use <strong>semantic versioning</strong> (semver): a version is <code>MAJOR.MINOR.PATCH</code>, and each part signals what changed.</p>
+  <ul>
+    <li><strong>MAJOR</strong> (the <code>1</code>) — a breaking change; code written for the old version may stop compiling.</li>
+    <li><strong>MINOR</strong> (the <code>13</code>) — new features, backward-compatible; old code keeps working.</li>
+    <li><strong>PATCH</strong> (the <code>3</code>) — backward-compatible bug fixes only.</li>
+  </ul>
+  <p>The bare string <code>"1.13.3"</code> in <code>Cargo.toml</code> is <em>not</em> "exactly 1.13.3." It is shorthand for a <strong>caret requirement</strong>, <code>^1.13.3</code>, which means "at least 1.13.3, and anything below the next major version":</p>
+  <pre><code>unicode-segmentation = "1.13.3"   <span class="c">// means ^1.13.3  →  &gt;=1.13.3, &lt;2.0.0</span></code></pre>
+  <p>So Cargo may resolve to <code>1.13.4</code> or <code>1.20.0</code> when they exist — those are compatible — but never <code>2.0.0</code>, which by semver is allowed to break you. The rule for caret: it permits changes that do not modify the left-most <em>non-zero</em> component.</p>
+  <p>That last phrase matters for pre-1.0 crates, which are common. When the major version is <code>0</code>, the left-most non-zero component is the <em>minor</em>, so the minor becomes the breaking one:</p>
+  <pre><code>foo = "0.5.2"   <span class="c">// ^0.5.2  →  &gt;=0.5.2, &lt;0.6.0   (minor is treated as breaking)</span></code></pre>
+  <p><strong>Your turn</strong> — suppose you add a crate and Cargo writes <code>bar = "0.2.4"</code>. Applying the same rule, which versions may Cargo resolve to?</p>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>bar = "0.2.4"   // ^0.2.4  →  &gt;=0.2.4, &lt;0.3.0</code></pre>
+    <p>The major is <code>0</code>, so the left-most non-zero component is the minor (<code>2</code>). Caret locks it: Cargo may pick <code>0.2.5</code> or <code>0.2.99</code>, but <code>0.3.0</code> is treated as a breaking release and is excluded. (For <code>0.0.z</code> versions the patch is the only non-zero part, so <code>^0.0.3</code> allows <em>only</em> <code>0.0.3</code>.)</p>
+  </details>
+
+  <h2>Step 3 — The lockfile: <code>Cargo.lock</code></h2>
+  <p><code>Cargo.toml</code> says what you <em>allow</em> (a range); <code>Cargo.lock</code> records what Cargo actually <em>chose</em> — one exact version per crate in the whole dependency tree, with a checksum. Open it after the <code>cargo add</code> and you will see two things changed: your <code>rwc</code> package now lists its dependency, and a new entry pins the exact crate Cargo downloaded:</p>
+  <pre><code># This file is automatically @generated by Cargo.
+# It is not intended for manual editing.
+version = 4
+
+[[package]]
+name = "rwc"
+version = "0.1.0"
+<span class="add">dependencies = [</span>
+<span class="add"> "unicode-segmentation",</span>
+<span class="add">]</span>
+
+<span class="add">[[package]]</span>
+<span class="add">name = "unicode-segmentation"</span>
+<span class="add">version = "1.13.3"</span>
+<span class="add">source = "registry+https://github.com/rust-lang/crates.io-index"</span>
+<span class="add">checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"</span></code></pre>
+  <p>You never edit this file by hand — Cargo writes it. Its job is <strong>reproducible builds</strong>. Once the lock exists, <code>cargo build</code> uses the exact versions it records and does <em>not</em> re-resolve, even if <code>1.13.4</code> is published tomorrow. Commit <code>Cargo.lock</code> to version control so your machine, a teammate's, and CI all compile <code>rwc</code> against byte-for-byte the same dependencies. (The old advice was "commit the lock for binaries, not libraries"; current guidance is to commit it either way. <code>rwc</code> is a binary, so this was never in doubt.)</p>
+  <p>You can inspect the resolved tree at any time:</p>
+  <pre class="shell"><code>cargo tree</code></pre>
+  <pre class="shell"><code>rwc v0.1.0 (/…/0010-rwc)
+└── unicode-segmentation v1.13.3</code></pre>
+  <p>To move within the semver range on purpose — pick up newer compatible versions and rewrite the lock — you run <code>cargo update</code> (or <code>cargo update -p unicode-segmentation</code> for just one crate). Nothing to update yet, but the dry run shows what it would do without touching the file:</p>
+  <pre class="shell"><code>cargo update --dry-run</code></pre>
+  <pre class="shell"><code>    Updating crates.io index
+     Locking 0 packages to latest Rust 1.96.0 compatible versions
+warning: not updating lockfile due to dry run</code></pre>
+  <p>The split is the whole point: <code>Cargo.toml</code> is the <em>policy</em> (which versions are acceptable), <code>Cargo.lock</code> is the <em>fact</em> (which versions you built with), and <code>cargo update</code> is the only routine command that changes the fact.</p>
+
+  <h2>Step 4 — Use the crate: a grapheme count</h2>
+  <p>Now spend the dependency. The crate adds its <code>.graphemes()</code> method to <code>&amp;str</code> through an <em>extension trait</em> called <code>UnicodeSegmentation</code> — and, exactly like <code>std::io::Read</code> whose <code>read_to_string</code> you called back in Lesson 6, a trait's methods are callable only when the trait is in scope. So bring it in at the top of <code>lib.rs</code>:</p>
+  <pre><code>use std::fs;
+use std::io::{self, Read};
+<span class="add">use unicode_segmentation::UnicodeSegmentation;</span></code></pre>
+  <p>Add the field to <code>Counts</code>. While you are in its doc comment, record what a grapheme <em>is</em> — and add a doc-test that shows the case where it differs from <code>chars</code>, using the combining "é" (<code>e</code> + <code>U+0301</code>):</p>
+  <pre><code><span class="c">/// A struct to hold counts of lines, words, bytes, characters, and graphemes.</span>
+<span class="c">///</span>
+<span class="add">/// `chars` counts Unicode scalar values (`char`); `graphemes` counts</span>
+<span class="add">/// user-perceived characters (grapheme clusters), so an accented letter</span>
+<span class="add">/// written as a base plus a combining mark counts as two `chars` but one</span>
+<span class="add">/// grapheme. `graphemes &lt;= chars &lt;= bytes` always holds.</span>
+<span class="c">///</span>
+<span class="c">/// ```</span>
+<span class="c">/// use rwc::Counts;</span>
+<span class="c">/// // ... the ascii assertions from Lesson 8 stay ...</span>
+<span class="add">/// assert_eq!(counts.graphemes, 26); // pure ASCII: one grapheme per char</span>
+<span class="add">///</span>
+<span class="add">/// // "e" + U+0301 (combining acute) renders as "é": 3 bytes, 2 chars, 1 grapheme.</span>
+<span class="add">/// let combined = Counts::from_text("e\u{301}");</span>
+<span class="add">/// assert_eq!(combined.bytes, 3);</span>
+<span class="add">/// assert_eq!(combined.chars, 2);</span>
+<span class="add">/// assert_eq!(combined.graphemes, 1);</span>
+<span class="c">/// ```</span>
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Counts {
+    pub lines: usize,
+    pub words: usize,
+    pub bytes: usize,
+    pub chars: usize,
+<span class="add">    pub graphemes: usize,</span>
+}</code></pre>
+  <p>Fill the field in <code>from_text</code>. This is the crate's method at work — <code>graphemes(true)</code> asks for <em>extended</em> grapheme clusters, the Unicode-correct default:</p>
+  <pre><code>    pub fn from_text(text: &amp;str) -&gt; Counts {
+        Counts {
+            lines: text.lines().count(),
+            words: text.split_whitespace().count(),
+            bytes: text.len(),
+            chars: text.chars().count(),
+<span class="add">            graphemes: text.graphemes(true).count(),</span>
+        }
+    }</code></pre>
+  <p><strong>Your turn</strong> — accumulate the new field in <code>add</code>, the same way the four counts above it are summed:</p>
+  <pre><code>    pub fn add(&amp;mut self, other: Counts) {
+        self.lines += other.lines;
+        self.words += other.words;
+        self.bytes += other.bytes;
+        self.chars += other.chars;
+<span class="add">        <span class="todo">// TODO (your turn): accumulate graphemes the same way</span></span>
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>        self.graphemes += other.graphemes;</code></pre>
+  </details>
+  <p>Last, the output row. <code>Report::line</code> prints the counts; it needs a fifth column. Update its doc comment and doc-test to the five-number row first — that fixed-width string is exactly what your code must produce:</p>
+  <pre><code>    <span class="c">/// Formats the report as one output row: the five counts, then the label.</span>
+    /// ```
+    /// use rwc::{Counts, Report};
+    /// let report = Report::new("-", Counts::from_text("a b c\n"));
+<span class="add">    /// assert_eq!(report.line(), "     1      3      6      6      6 -");</span>
+    /// ```</code></pre>
+  <p><strong>Your turn</strong> — add the fifth <code>{:&gt;6}</code> column to the format string (done for you below) and pass <code>graphemes</code> in its place among the arguments — right after <code>chars</code>, before the label:</p>
+  <pre><code>    pub fn line(&amp;self) -&gt; String {
+        format!(
+<span class="add">            "{:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} {}",</span>
+<span class="add">            <span class="todo">// TODO (your turn): self.counts fields — lines, words, bytes, chars, graphemes — then self.label</span></span>
+        )
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    pub fn line(&amp;self) -&gt; String {
+        format!(
+            "{:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} {}",
+            self.counts.lines,
+            self.counts.words,
+            self.counts.bytes,
+            self.counts.chars,
+            self.counts.graphemes,
+            self.label
+        )
+    }</code></pre>
+  </details>
+  <p><code>main.rs</code> needs <em>no changes at all</em>. It builds each row through <code>Report::line</code> and never mentions the individual counts — so the new column flows through <code>from_text</code> → <code>add</code> → <code>line</code> on its own. That is the payoff of the Lesson 9 refactor: the formatting lives in one place, and a new count is a library change, not a <code>main</code> change.</p>
+
+  <p>Pin the new behaviour with a unit test. It mirrors the combining-"é" doc-test you wrote on the struct, but as a standalone <code>#[test]</code> and with a longer string so all three counts differ:</p>
+  <pre><code>#[cfg(test)]
+mod tests {
+    use super::*;
+    <span class="c">// ... existing tests unchanged ...</span>
+
+<span class="add">    #[test]</span>
+<span class="add">    fn counts_graphemes_below_chars_for_combining() {</span>
+<span class="add">        // "café" with a *combining* acute (e + U+0301), not the precomposed é.</span>
+<span class="add">        let c = Counts::from_text("cafe\u{301}");</span>
+<span class="add">        <span class="todo">// TODO (your turn): assert bytes is 6, chars is 5, graphemes is 4</span></span>
+<span class="add">    }</span>
+}</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    #[test]
+    fn counts_graphemes_below_chars_for_combining() {
+        // "café" with a *combining* acute (e + U+0301), not the precomposed é.
+        let c = Counts::from_text("cafe\u{301}");
+        assert_eq!(c.bytes, 6); // 4 ASCII + 2 for the combining mark
+        assert_eq!(c.chars, 5); // c a f e ◌́
+        assert_eq!(c.graphemes, 4); // c a f é
+    }</code></pre>
+  </details>
+
+  <h2>Step 5 — Pin the toolchain: <code>rust-toolchain.toml</code></h2>
+  <p><code>Cargo.lock</code> pins your <em>dependencies</em>, but not the <em>compiler</em>. Build <code>rwc</code> with a different <code>rustc</code> and you could get different warnings, different generated code, even a different result if a language feature changed. A <code>rust-toolchain.toml</code> at the project root pins the compiler too: <a href="https://rustup.rs">rustup</a> reads it and switches to exactly that toolchain whenever you run <code>cargo</code> in this directory. Reproducible dependencies <em>and</em> a reproducible compiler is what makes the whole build reproducible.</p>
+  <p>Find the version you are on:</p>
+  <pre class="shell"><code>rustc --version</code></pre>
+  <pre class="shell"><code>rustc 1.96.0 (ac68faa20 2026-05-25)</code></pre>
+  <p><strong>Your turn</strong> — create <code>rust-toolchain.toml</code> next to <code>Cargo.toml</code>, with a <code>[toolchain]</code> table whose <code>channel</code> is that version (the course pins <code>1.96</code>):</p>
+  <pre><code>[toolchain]
+<span class="todo"># TODO (your turn): channel = "&lt;the version rustc --version reported&gt;"</span></code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>[toolchain]
+channel = "1.96.0"</code></pre>
+  </details>
+  <p>Now <code>cargo</code> in <code>0010-rwc/</code> always uses <code>1.96.0</code>. If a teammate has a newer default toolchain installed, rustup will fetch and use <code>1.96.0</code> here instead of their default — so the build is identical to yours.</p>
+
+  <h2>Run it</h2>
+  <p>Test first. The new unit test joins the Lesson 9 suite (now <strong>12</strong>), and the extra doc-test assertions run inside the existing doc-tests:</p>
+  <pre class="shell"><code>cargo test</code></pre>
+  <pre class="shell"><code>running 12 tests
+test tests::counts_ascii ... ok
+test tests::counts_unicode ... ok
+test tests::counts_empty ... ok
+test tests::first_chars_respects_boundaries ... ok
+test tests::counts_graphemes_below_chars_for_combining ... ok
+test tests::add_accumulates_counts ... ok
+test tests::add_accumulates_counts_with_chars ... ok
+test tests::from_args_dash_is_stdin ... ok
+test tests::from_args_empty_defaults_to_stdin ... ok
+test tests::from_args_map_paths_to_files ... ok
+test tests::report_borrows_label_and_holds_counts ... ok
+test tests::from_args_rejects_unknown_flag ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; ...
+
+   Doc-tests rwc
+
+running 11 tests
+test result: ok. 11 passed; 0 failed; 0 ignored; ...</code></pre>
+  <p>Then see the new column earn its place. Make a file whose graphemes, chars, and bytes all differ — "café" with a <em>combining</em> accent (the <code>\314\201</code> is the two UTF-8 bytes of <code>U+0301</code>, written in octal so any shell reproduces it exactly):</p>
+  <pre class="shell"><code>printf 'a b c\n' &gt; demo.txt
+printf 'cafe\314\201\n' &gt; combining.txt
+cargo run -- demo.txt combining.txt</code></pre>
+  <pre class="shell"><code>     1      3      6      6      6 demo.txt
+     1      1      7      6      5 combining.txt
+     2      4     13     12     11 total</code></pre>
+  <p>Read the <code>combining.txt</code> row across the five columns: 1 line, 1 word, <strong>7 bytes</strong>, <strong>6 chars</strong>, <strong>5 graphemes</strong>. The word is <code>café</code> written as <code>c a f e ◌́</code> plus a newline: 4 ASCII + 2 for the combining mark + 1 newline = 7 bytes; 6 scalar values; but only 5 graphemes, because <code>e</code> + accent is one. That gap — <code>graphemes &lt; chars &lt; bytes</code> — is exactly the correctness the crate bought you, and the standard library could not.</p>
+
+  <div class="win">
+    <span class="label">Outcome</span>
+    <code>rwc</code> now has its first external dependency. You added it with <code>cargo add</code>, read its caret semver requirement, saw <code>Cargo.lock</code> pin an exact version and checksum for reproducible builds, and pinned the compiler with <code>rust-toolchain.toml</code>. You spent the crate on a real feature — a Unicode-correct grapheme count that std cannot give you — by bringing its extension trait into scope, the same "trait in scope" rule as <code>Read</code>. Module 3 is under way: next comes a proper flag parser.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>Break the lock, then fix it.</strong> Change <code>Cargo.toml</code> to <code>unicode-segmentation = "1.0"</code> and run <code>cargo build</code>; watch it pick the newest <code>1.x</code> and rewrite <code>Cargo.lock</code>. Then set it back to <code>"1.13.3"</code>. Confirm with <code>cargo tree</code> which version you end up on and why.</li>
+    <li><strong>Try an incompatible bump.</strong> Set the requirement to <code>"2"</code> and run <code>cargo build</code>. Read the error — there is no <code>2.x</code>, so resolution fails. This is semver refusing to hand you a version the requirement forbids.</li>
+    <li><strong>A harder grapheme.</strong> Add a file containing a single family emoji (e.g. 👨‍👩‍👧) and count it. Predict bytes, chars, and graphemes before you run; the grapheme count should be 1 while chars is much larger. Explain the gap.</li>
+    <li><strong>Offline build.</strong> After one successful build, run <code>cargo build --offline</code>. It works because the crate is cached and the lockfile already names it — no network needed. That is reproducibility paying off.</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">Cargo.toml has <code>unicode-segmentation = "1.13.3"</code>. Which versions may Cargo resolve to?</p>
+    <button class="quiz-opt" data-correct>Any <code>&gt;=1.13.3</code> and <code>&lt;2.0.0</code> — a bare version is a caret requirement</button>
+    <button class="quiz-opt">Exactly <code>1.13.3</code> and nothing else</button>
+    <button class="quiz-opt">Any version at all, including <code>2.0.0</code> and later</button>
+    <p class="quiz-fb ok" hidden>Right — <code>"1.13.3"</code> means <code>^1.13.3</code>, i.e. <code>&gt;=1.13.3, &lt;2.0.0</code>. Cargo may pick a newer compatible <code>1.x</code>, but <code>2.0.0</code> is a breaking major release and is excluded. To pick up a newer <code>1.x</code> you run <code>cargo update</code>.</p>
+    <p class="quiz-fb no" hidden>A bare version is not "exactly this" and not "anything." It is a caret requirement: <code>"1.13.3"</code> = <code>^1.13.3</code> = <code>&gt;=1.13.3, &lt;2.0.0</code>. Compatible <code>1.x</code> updates are allowed; a <code>2.0.0</code> major bump is not.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">Why commit <code>Cargo.lock</code> to version control for <code>rwc</code>?</p>
+    <button class="quiz-opt" data-correct>So every build — yours, a teammate's, CI — resolves the exact same dependency versions</button>
+    <button class="quiz-opt">Cargo can't download crates without it; the build fails otherwise</button>
+    <button class="quiz-opt">It records which lines of your source code changed since the last build</button>
+    <p class="quiz-fb ok" hidden>Right — the lockfile pins one exact version (and checksum) per crate, so a build reproduces identically across machines and time. Cargo can regenerate a lock from <code>Cargo.toml</code>, but then everyone might resolve to different versions.</p>
+    <p class="quiz-fb no" hidden>Cargo can regenerate the lock from <code>Cargo.toml</code> and download crates fine without a committed lock — but then different machines may resolve to different versions. Committing it guarantees identical, reproducible builds. It has nothing to do with tracking source changes; that is git's job.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q"><code>Cargo.lock</code> pins your dependency versions. What does <code>rust-toolchain.toml</code> pin?</p>
+    <button class="quiz-opt" data-correct>The compiler/toolchain version used in this project</button>
+    <button class="quiz-opt">The versions of your dependencies (a second copy of the lockfile)</button>
+    <button class="quiz-opt">The Rust <em>edition</em>, like 2021 or 2024</button>
+    <p class="quiz-fb ok" hidden>Right — <code>rust-toolchain.toml</code> pins <em>rustc</em> itself, so everyone compiles with the same compiler. Dependencies are the lockfile's job; the edition is the <code>edition</code> field in <code>Cargo.toml</code>. Reproducible build = pinned deps + pinned compiler.</p>
+    <p class="quiz-fb no" hidden>Dependencies are pinned by <code>Cargo.lock</code>, and the edition is set by <code>edition</code> in <code>Cargo.toml</code>. <code>rust-toolchain.toml</code> pins a different thing: the <em>compiler version</em> rustup uses in this directory.</p>
+  </div>
+
+  <h2>Primary sources</h2>
+  <p>The authoritative reference for version requirements is <a href="https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html"><strong>The Cargo Book — "Specifying Dependencies"</strong></a> (caret, the <code>0.x</code> rule, and every other operator). The lock-vs-manifest split is <a href="https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html"><strong>"Cargo.toml vs Cargo.lock."</strong></a> The semver rules themselves are the <a href="https://semver.org/"><strong>Semantic Versioning spec</strong></a>. Toolchain files are documented under <a href="https://rust-lang.github.io/rustup/overrides.html"><strong>rustup — "Overrides."</strong></a> The crate you added lives at <a href="https://docs.rs/unicode-segmentation"><strong>docs.rs/unicode-segmentation</strong></a>.</p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If <code>cargo build</code> ever reports a version conflict, paste the whole message — it names the two requirements that can't both be satisfied. Next: <strong>Lesson 11 adds flags with <code>clap</code></strong> — <code>--lines</code>/<code>--words</code>/<code>--chars</code>, generated <code>--help</code>, and validation, built on clap's derive API over the <code>Counts</code> struct.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0009-lifetimes.html">◂ Lesson 9: Lifetimes</a>
+      <a href="https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html">📘 Cargo Book: Dependencies</a>
+      <span>Next ▸ Lesson 11: Flags with clap</span>
+    </div>
+  </div>
+</div>

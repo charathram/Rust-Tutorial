@@ -36,12 +36,32 @@
       <dd>A single type that holds <em>any</em> value implementing the <code>Error</code> trait, with the concrete type resolved at runtime (<code>dyn</code>). Used as a catch-all error type so <code>?</code> can convert many error kinds into one return type. <span class="seen">Lesson 2</span></dd>
     </div>
     <div class="term">
+      <dt>Cargo.lock (lockfile) <span class="seen">(Lesson 10)</span></dt>
+      <dd>The auto-generated file recording the <em>exact</em> version (and a checksum) of every crate resolved for a build, across the whole dependency tree. Where <code>Cargo.toml</code> states a version <em>range</em>, <code>Cargo.lock</code> records the one version Cargo actually chose, so a build reproduces identically on any machine and at any later date. Cargo writes it — you never edit it by hand — but you do commit it to version control. Once it exists, <code>cargo build</code> reuses it and does not re-resolve; only <code>cargo update</code> routinely rewrites it.</dd>
+    </div>
+    <div class="term">
+      <dt>char (Unicode scalar value) <span class="seen">(Lesson 8)</span></dt>
+      <dd>Rust's character type: a single Unicode <em>scalar value</em>, four bytes wide, written with single quotes (<code>'a'</code>, <code>'é'</code>). Iterating a string with <code>.chars()</code> yields these. A <code>char</code> is not the same as a byte — a multi-byte UTF-8 character is still one <code>char</code> — nor always a full user-visible glyph, since a base letter plus a combining accent is two <code>char</code>s but one grapheme.</dd>
+    </div>
+    <div class="term">
       <dt>Clone</dt>
       <dd>An <em>explicit</em>, potentially expensive deep copy (<code>x.clone()</code>) that duplicates heap data so both bindings own independent values. Rust never does this implicitly. <span class="seen">Orientation</span></dd>
     </div>
     <div class="term">
       <dt>Copy (trait)</dt>
       <dd>A marker trait for small, fixed-size, stack-only types (integers, <code>bool</code>, <code>char</code>, <code>f64</code>, tuples of such). Assigning a <code>Copy</code> value duplicates it instead of moving it, so the original stays valid. <span class="seen">Orientation</span></dd>
+    </div>
+    <div class="term">
+      <dt>Crate <span class="seen">(Lesson 10)</span></dt>
+      <dd>A Rust package — the unit of compilation and distribution. A crate is either a <em>library</em> (<code>src/lib.rs</code>) or a <em>binary</em> (<code>src/main.rs</code>); published crates live on the registry crates.io and are reused by name (e.g. <code>use unicode_segmentation::…</code>). See also <em>Library crate vs binary crate</em> and <em>Dependency</em>.</dd>
+    </div>
+    <div class="term">
+      <dt>crates.io <span class="seen">(Lesson 10)</span></dt>
+      <dd>The official Rust package registry at <a href="https://crates.io">crates.io</a> — where crates are published and where <code>cargo</code> downloads dependencies from. <code>cargo add &lt;name&gt;</code> looks a crate up here and picks the latest compatible version; <code>cargo</code> caches the index and the downloaded sources locally, so later builds (and <code>cargo build --offline</code>) need no network.</dd>
+    </div>
+    <div class="term">
+      <dt>Dependency <span class="seen">(Lesson 10)</span></dt>
+      <dd>A crate your project builds on, declared under the <code>[dependencies]</code> table of <code>Cargo.toml</code> with a version requirement (e.g. <code>unicode-segmentation = "1.13.3"</code>). <code>cargo add</code> writes the entry; Cargo downloads the crate from crates.io, records the resolved version in <code>Cargo.lock</code>, and makes it importable by name. A dependency's own dependencies are pulled in transitively (inspect the tree with <code>cargo tree</code>).</dd>
     </div>
     <div class="term">
       <dt>derive <span class="seen">(Lesson 6)</span></dt>
@@ -64,6 +84,10 @@
       <dd>A <code>match</code> must cover every possible case. For an enum that means an arm per variant (or a <code>_</code> wildcard). Add a variant and every non-wildcard <code>match</code> stops compiling (<code>E0004</code>) until it handles the new case — a compile-time guarantee that you never forget one.</dd>
     </div>
     <div class="term">
+      <dt>Grapheme (grapheme cluster) <span class="seen">(Lesson 10)</span></dt>
+      <dd>A user-perceived character — what a reader counts as one symbol — which may be built from several Unicode scalar values (<code>char</code>s). A base letter plus a combining accent (<code>e</code> + <code>U+0301</code> renders as "é"), or a joined emoji sequence (a family, a flag), is one grapheme but multiple <code>char</code>s, so <code>graphemes &lt;= chars &lt;= bytes</code>. The standard library does not segment graphemes (there is no <code>str::graphemes</code>); the <code>unicode-segmentation</code> crate adds a <code>.graphemes(true)</code> method to <code>&amp;str</code>.</dd>
+    </div>
+    <div class="term">
       <dt>Guard (match) <span class="seen">(Lesson 7)</span></dt>
       <dd>An extra condition on a <code>match</code> arm, written <code>pattern if condition</code>. The arm runs only when the pattern matches <em>and</em> the condition is true, e.g. <code>Source::File(path) if path.ends_with(".md")</code>. A guard does not count toward exhaustiveness.</dd>
     </div>
@@ -74,6 +98,14 @@
     <div class="term">
       <dt>Library crate vs binary crate <span class="seen">(Lesson 6)</span></dt>
       <dd><code>src/main.rs</code> is a <em>binary</em> crate (produces an executable); <code>src/lib.rs</code> is a <em>library</em> crate (reusable code, imported by package name, e.g. <code>use rwc::Counts</code>). A package can hold both, with the binary depending on the library.</dd>
+    </div>
+    <div class="term">
+      <dt>Lifetime <span class="seen">(Lesson 9)</span></dt>
+      <dd>The region of code for which a reference is valid — the compiler's name for how long a borrow lasts, written <code>'a</code> ("tick-a"). A reference type can carry it (<code>&amp;'a str</code>), and the borrow checker refuses any use of the reference outside its lifetime, which is how it guarantees a reference never outlives its data. You rarely write one (see <em>lifetime elision</em>); the exception is a type that stores a reference, e.g. <code>struct Report&lt;'a&gt; { label: &amp;'a str }</code>, where you must name it (error <code>E0106</code> if you don't).</dd>
+    </div>
+    <div class="term">
+      <dt>Lifetime elision <span class="seen">(Lesson 9)</span></dt>
+      <dd>The three rules that let you omit lifetime annotations in common function signatures. (1) Each elided input reference gets its own lifetime; (2) if there is exactly one input lifetime, it is assigned to every elided output; (3) if a parameter is <code>&amp;self</code>/<code>&amp;mut self</code>, its lifetime is assigned to every elided output. They explain why <code>fn name(&amp;self) -&gt; &amp;str</code> and <code>fn first_chars(s: &amp;str, n: usize) -&gt; &amp;str</code> need no annotation. Elision does not apply to struct definitions, and it gives up when there are several input references and no <code>self</code>.</dd>
     </div>
     <div class="term">
       <dt><code>match</code> <span class="seen">(Lesson 6, 7)</span></dt>
@@ -116,20 +148,36 @@
       <dd>An enum for an operation that may fail: <code>Ok(value)</code> or <code>Err(error)</code>. Returned by anything fallible (e.g. file IO). The error must be acknowledged before the success value can be used. <span class="seen">Lesson 1, 2</span></dd>
     </div>
     <div class="term">
+      <dt>rust-toolchain.toml <span class="seen">(Lesson 10)</span></dt>
+      <dd>A file at the project root that pins the <em>compiler</em>: rustup reads its <code>[toolchain]</code> <code>channel</code> (e.g. <code>"1.96.0"</code>) and switches to exactly that toolchain for any <code>cargo</code> command run in the directory, fetching it if needed. Where <code>Cargo.lock</code> pins dependencies, this pins the compiler — together they make a build reproducible across machines and time.</dd>
+    </div>
+    <div class="term">
       <dt>Scope</dt>
       <dd>The region of code (usually a <code>{ }</code> block) over which a binding is valid. Ownership and dropping are tied to scope boundaries. <span class="seen">Orientation</span></dd>
+    </div>
+    <div class="term">
+      <dt>Semantic versioning (semver) <span class="seen">(Lesson 10)</span></dt>
+      <dd>The <code>MAJOR.MINOR.PATCH</code> version scheme crates follow: a MAJOR bump signals a breaking change, MINOR adds backward-compatible features, and PATCH is backward-compatible fixes. In <code>Cargo.toml</code> a bare version like <code>"1.13.3"</code> is a <em>caret</em> requirement (<code>^1.13.3</code> = <code>&gt;=1.13.3, &lt;2.0.0</code>): Cargo may resolve any newer compatible version but never the next major. For <code>0.x</code> versions the left-most non-zero part is treated as breaking, so <code>^0.2.4</code> means <code>&gt;=0.2.4, &lt;0.3.0</code>.</dd>
+    </div>
+    <div class="term">
+      <dt>Slice <span class="seen">(Lesson 8)</span></dt>
+      <dd>A borrowed view into a contiguous run of a sequence — a pointer plus a length, owning nothing. <code>&amp;str</code> is a slice of a string's UTF-8 bytes; <code>&amp;[T]</code> slices arrays and vectors. A string-slice expression <code>&amp;s[a..b]</code> uses <em>byte</em> offsets and must land on character boundaries or it panics at runtime; <code>s.get(a..b)</code> returns <code>Option&lt;&amp;str&gt;</code> instead of panicking.</dd>
     </div>
     <div class="term">
       <dt>Stack / Heap</dt>
       <dd>Stack: fast, fixed-size, LIFO storage for values whose size is known at compile time. Heap: storage for data of size unknown or variable at compile time (e.g. a growable <code>String</code>), reached via a pointer held on the stack. <span class="seen">Orientation</span></dd>
     </div>
     <div class="term">
-      <dt>String vs &amp;str <span class="seen">(preview — Module 2)</span></dt>
-      <dd><code>String</code> is an owned, growable, heap-allocated UTF-8 string; <code>&amp;str</code> is a borrowed view (slice) into UTF-8 text. Detailed in a later lesson.</dd>
+      <dt><code>'static</code> <span class="seen">(Lesson 9)</span></dt>
+      <dd>The longest lifetime: data that lives from the point it exists until the program ends. A string literal has type <code>&amp;'static str</code> because it is baked into the compiled binary. A <code>&amp;'static str</code> satisfies any lifetime a borrow could require. It is a real lifetime, the maximal one — not a keyword to sprinkle on to silence errors. (A related but distinct <em>trait bound</em> <code>T: 'static</code> surfaces later under threads and async.)</dd>
+    </div>
+    <div class="term">
+      <dt>String vs &amp;str <span class="seen">(Lesson 8)</span></dt>
+      <dd><code>String</code> is an <em>owned</em>, growable, heap-allocated buffer of UTF-8 bytes; <code>&amp;str</code> (a "string slice") is a <em>borrowed</em> view into UTF-8 text someone else owns — a pointer and a length, owning nothing. A string literal is a <code>&amp;str</code>, and <code>&amp;some_string</code> coerces to one. Convention: take <code>&amp;str</code> as a parameter (it accepts both), return <code>String</code> when you build new text and <code>&amp;str</code> when you hand back a view into data that already exists.</dd>
     </div>
     <div class="term">
       <dt>struct <span class="seen">(Lesson 6)</span></dt>
-      <dd>A custom type bundling named fields held <em>together</em> (a "product type") — e.g. <code>Counts { lines, words, chars }</code>. Fields and the type carry <code>pub</code> visibility independently; methods and associated functions live in an <code>impl</code> block. The named fields replace positional tuple access (<code>.0</code>/<code>.1</code>).</dd>
+      <dd>A custom type bundling named fields held <em>together</em> (a "product type") — e.g. <code>Counts { lines, words, bytes, chars }</code>. Fields and the type carry <code>pub</code> visibility independently; methods and associated functions live in an <code>impl</code> block. The named fields replace positional tuple access (<code>.0</code>/<code>.1</code>).</dd>
     </div>
     <div class="term">
       <dt>Trait <span class="seen">(seen: Orientation, Lessons 2 &amp; 6 — full treatment Module 4)</span></dt>
@@ -142,6 +190,10 @@
     <div class="term">
       <dt>Unit test (<code>#[test]</code> / <code>#[cfg(test)]</code>)</dt>
       <dd>A function marked <code>#[test]</code>, usually inside a <code>#[cfg(test)] mod tests</code> module that is compiled only when running tests. <code>cargo test</code> runs every such function and reports pass/fail. <span class="seen">Lesson 3</span></dd>
+    </div>
+    <div class="term">
+      <dt>UTF-8 / character boundary <span class="seen">(Lesson 8)</span></dt>
+      <dd>The variable-width encoding Rust strings always use: each character takes one to four bytes (ASCII is one). So <code>str::len</code> is a <em>byte</em> count, not a character count — use <code>.chars().count()</code> for characters. A <em>character boundary</em> is a byte offset where one encoded character ends and the next begins; slicing a string off a boundary panics, which is also why Rust forbids integer indexing (<code>s[i]</code>) of strings.</dd>
     </div>
   </dl>
 

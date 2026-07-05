@@ -18,7 +18,10 @@
     { n: '4', title: 'Borrowing &amp; references', file: '0004-borrowing.html' },
     { n: '5', title: 'Reading borrow-checker errors', file: '0005-borrow-checker-errors.html' },
     { n: '6', title: 'Structs &amp; enums', file: '0006-structs-enums.html' },
-    { n: '7', title: 'Pattern matching', file: '0007-pattern-matching.html' }
+    { n: '7', title: 'Pattern matching', file: '0007-pattern-matching.html' },
+    { n: '8', title: 'Strings &amp; slices', file: '0008-strings-and-slices.html' },
+    { n: '9', title: 'Lifetimes',        file: '0009-lifetimes.html' },
+    { n: '10', title: 'Cargo &amp; dependencies', file: '0010-cargo-dependencies.html' }
   ];
   var REFS = [
     { title: 'Glossary', href: '../reference/glossary.html' }
