@@ -21,7 +21,8 @@
     { n: '7', title: 'Pattern matching', file: '0007-pattern-matching.html' },
     { n: '8', title: 'Strings &amp; slices', file: '0008-strings-and-slices.html' },
     { n: '9', title: 'Lifetimes',        file: '0009-lifetimes.html' },
-    { n: '10', title: 'Cargo &amp; dependencies', file: '0010-cargo-dependencies.html' }
+    { n: '10', title: 'Cargo &amp; dependencies', file: '0010-cargo-dependencies.html' },
+    { n: '11', title: 'Flags with clap', file: '0011-clap-flags.html' }
   ];
   var REFS = [
     { title: 'Glossary', href: '../reference/glossary.html' }

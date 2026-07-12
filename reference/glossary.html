@@ -36,12 +36,20 @@
       <dd>A single type that holds <em>any</em> value implementing the <code>Error</code> trait, with the concrete type resolved at runtime (<code>dyn</code>). Used as a catch-all error type so <code>?</code> can convert many error kinds into one return type. <span class="seen">Lesson 2</span></dd>
     </div>
     <div class="term">
+      <dt>Cargo feature <span class="seen">(Lesson 11)</span></dt>
+      <dd>An optional, additive capability of a crate, toggled in <code>Cargo.toml</code>. A crate declares named features (each enabling some code and/or extra dependencies); you switch a non-default one on with <code>cargo add &lt;crate&gt; --features &lt;name&gt;</code> or a <code>features = ["…"]</code> array in the dependency table — e.g. clap's <code>derive</code> feature enables the <code>#[derive(Parser)]</code> macro. Features are <em>additive</em>: enabling one never removes another.</dd>
+    </div>
+    <div class="term">
       <dt>Cargo.lock (lockfile) <span class="seen">(Lesson 10)</span></dt>
       <dd>The auto-generated file recording the <em>exact</em> version (and a checksum) of every crate resolved for a build, across the whole dependency tree. Where <code>Cargo.toml</code> states a version <em>range</em>, <code>Cargo.lock</code> records the one version Cargo actually chose, so a build reproduces identically on any machine and at any later date. Cargo writes it — you never edit it by hand — but you do commit it to version control. Once it exists, <code>cargo build</code> reuses it and does not re-resolve; only <code>cargo update</code> routinely rewrites it.</dd>
     </div>
     <div class="term">
       <dt>char (Unicode scalar value) <span class="seen">(Lesson 8)</span></dt>
       <dd>Rust's character type: a single Unicode <em>scalar value</em>, four bytes wide, written with single quotes (<code>'a'</code>, <code>'é'</code>). Iterating a string with <code>.chars()</code> yields these. A <code>char</code> is not the same as a byte — a multi-byte UTF-8 character is still one <code>char</code> — nor always a full user-visible glyph, since a base letter plus a combining accent is two <code>char</code>s but one grapheme.</dd>
+    </div>
+    <div class="term">
+      <dt>clap <span class="seen">(Lesson 11)</span></dt>
+      <dd>The de-facto standard command-line argument-parser crate. Its <em>derive</em> API lets you describe a CLI as a <code>struct</code> with <code>#[derive(Parser)]</code>: each field is an argument, <code>#[arg(short, long)]</code> makes a flag, a <code>Vec&lt;String&gt;</code> field collects positionals, and each <code>///</code> doc comment becomes help text. From that, clap generates the parser, <code>--help</code>, <code>--version</code>, and input validation. Requires the <code>derive</code> feature (see <em>Cargo feature</em>).</dd>
     </div>
     <div class="term">
       <dt>Clone</dt>
@@ -82,6 +90,10 @@
     <div class="term">
       <dt>Exhaustiveness <span class="seen">(Lesson 7)</span></dt>
       <dd>A <code>match</code> must cover every possible case. For an enum that means an arm per variant (or a <code>_</code> wildcard). Add a variant and every non-wildcard <code>match</code> stops compiling (<code>E0004</code>) until it handles the new case — a compile-time guarantee that you never forget one.</dd>
+    </div>
+    <div class="term">
+      <dt>Flag / option / positional argument <span class="seen">(Lesson 11)</span></dt>
+      <dd>The three kinds of command-line argument. A <em>flag</em> is a boolean switch that is either present or not (<code>-l</code>, <code>--lines</code>); an <em>option</em> takes a value (<code>--output file.txt</code>); a <em>positional</em> is an unnamed argument identified by where it appears (the file paths in <code>rwc a.txt b.txt</code>). In clap's derive API a <code>bool</code> field is a flag, and a field with no <code>short</code>/<code>long</code> is positional; a <code>Vec</code> collects every leftover value.</dd>
     </div>
     <div class="term">
       <dt>Grapheme (grapheme cluster) <span class="seen">(Lesson 10)</span></dt>
@@ -182,6 +194,10 @@
     <div class="term">
       <dt>Trait <span class="seen">(seen: Orientation, Lessons 2 &amp; 6 — full treatment Module 4)</span></dt>
       <dd>A named set of methods a type can promise to provide — Rust's mechanism for <em>shared behaviour</em>, close to an interface (Go/Java) or an abstract base class (C++). A type opts in with <code>impl Trait for Type</code>; code can then accept "any type that implements <code>Trait</code>" without naming the concrete type. Traits power <code>#[derive(...)]</code> (<code>Copy</code>, <code>Default</code>, <code>Debug</code>, <code>PartialEq</code> are all traits), are required in scope to call their methods (e.g. <code>Read</code> for <code>read_to_string</code>), and underpin both <em>static dispatch</em> (generics with trait bounds, resolved at compile time) and <em>dynamic dispatch</em> (trait objects like <code>Box&lt;dyn Error&gt;</code>, resolved at runtime).</dd>
+    </div>
+    <div class="term">
+      <dt>Transitive dependency <span class="seen">(Lesson 11)</span></dt>
+      <dd>A dependency of a dependency. When you add one crate, Cargo also pulls in everything that crate needs, and everything those need, recursively — e.g. <code>cargo add clap</code> brought in about 20 further crates. <code>cargo tree</code> shows the full graph, and <code>Cargo.lock</code> pins every crate in it, direct or transitive.</dd>
     </div>
     <div class="term">
       <dt>Type</dt>
