@@ -9,7 +9,7 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Lesson 1 · Build-along</p>
   <h1>Build a command-line tool: <code>rwc</code></h1>
-  <p class="subtitle">A working reimplementation of Unix <code>wc</code> — counting the lines, words, and characters in a file — built incrementally in four steps.</p>
+  <p class="subtitle">A working reimplementation of Unix <code>wc</code>, which counts the lines, words, and characters in a file, built incrementally in four steps.</p>
 
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
@@ -28,7 +28,7 @@
       <li>The project is scaffolded at <code>0001-rwc/</code> (named to match this lesson). Open a terminal there; the only file you edit is <code>src/main.rs</code>.</li>
       <li>Run with <code>cargo run -- &lt;args&gt;</code>. The <code>--</code> separates cargo's arguments from your program's: everything after it is passed to <code>rwc</code>.</li>
       <li>Run <code>cargo run</code> after every step, so you only ever debug a few new lines at a time.</li>
-      <li>From Step 2 on, lines <span class="add-swatch">highlighted in green</span> are those added or changed since the previous step — type or edit only those.</li>
+      <li>From Step 2 on, lines <span class="add-swatch">highlighted in green</span> are those added or changed since the previous step. Type or edit only those.</li>
     </ul>
   </div>
 
@@ -48,10 +48,10 @@ fn main() {
 
   <p>What each part of the fourth line does, left to right:</p>
   <ul>
-    <li><strong><code>env::args()</code></strong> — Returns the program's command-line arguments, but not as an array. It returns an <strong>iterator</strong>: a lazy sequence you pull values from one at a time, rather than a collection holding them all at once. (If you know Python generators, it is the same idea.) The methods that follow are how you draw a value out of that iterator.</li>
-    <li><strong><code>.nth(1)</code></strong> — Pulls the item at position 1 from the iterator. Positions are zero-based, and position 0 is always the path to the program itself, so the first argument a user actually typed is at position 1 — the file path we want.</li>
-    <li><strong><code>.expect("…")</code></strong> — There may be no argument at position 1, so the previous step does not return a plain value (the next callout explains exactly what it returns). <code>.expect</code> returns the value if one is present; if not, it stops the program immediately and prints this message. For now this is how we handle a missing argument.</li>
-    <li><strong><code>println!("… {path}")</code></strong> — Prints a line of text. The <code>!</code> tells you <code>println</code> is a <em>macro</em>, not a function — for now, just read <code>!</code> as "this is a macro" and move on. The <code>{path}</code> inside the string is filled in with the value of the <code>path</code> variable, the same way an f-string works in Python or a template literal in JavaScript.</li>
+    <li><strong><code>env::args()</code></strong> returns the program's command-line arguments, but not as an array. It gives you an <strong>iterator</strong>: a lazy sequence you pull values from one at a time, rather than a collection holding them all at once. (If you know Python generators, it is the same idea.) The methods that follow are how you draw a value out of that iterator.</li>
+    <li><strong><code>.nth(1)</code></strong> pulls the item at position 1 from the iterator. Positions are zero-based, and position 0 is always the path to the program itself, so the first argument a user actually typed is at position 1: the file path we want.</li>
+    <li><strong><code>.expect("…")</code></strong> covers the case where there is no argument at position 1, which means the previous step cannot return a plain value (the next callout explains exactly what it returns). <code>.expect</code> returns the value if one is present; if not, it stops the program immediately and prints this message. For now this is how we handle a missing argument.</li>
+    <li><strong><code>println!("… {path}")</code></strong> prints a line of text. The <code>!</code> tells you <code>println</code> is a <em>macro</em>, not a function. For now, just read <code>!</code> as "this is a macro" and move on. The <code>{path}</code> inside the string is filled in with the value of the <code>path</code> variable, the same way an f-string works in Python or a template literal in JavaScript.</li>
   </ul>
 
   <p>Run it both ways:</p>
@@ -60,7 +60,7 @@ cargo run -- ../MISSION.md  <span class="c"># prints: counting: ../MISSION.md</s
 
   <div class="note">
     <span class="label">Concept: <code>Option</code> and <code>.expect()</code></span>
-    There may be no second argument, so <code>.nth(1)</code> cannot return a plain <code>String</code>. It returns an <code>Option&lt;String&gt;</code> — either <code>Some(path)</code> or <code>None</code>. Rust requires you to address the <code>None</code> case before using the value, which eliminates an entire class of null/nil defects. <code>.expect("…")</code> handles <code>None</code> by stopping the program; Lesson 2 replaces it with graceful handling.
+    There may be no second argument, so <code>.nth(1)</code> cannot return a plain <code>String</code>. It returns an <code>Option&lt;String&gt;</code>: either <code>Some(path)</code> or <code>None</code>. Rust requires you to address the <code>None</code> case before using the value, which eliminates an entire class of null/nil defects. <code>.expect("…")</code> handles <code>None</code> by stopping the program; Lesson 2 replaces it with graceful handling.
   </div>
 
   <h2>Step 2 — Read the file's contents</h2>
@@ -75,10 +75,10 @@ fn main() {
 }</code></pre>
   <p>What each new line does:</p>
   <ul>
-    <li><strong><code>fs::read_to_string(&amp;path)</code></strong> — Opens the file at <code>path</code> and reads its entire contents into a single <code>String</code> in memory. For the files we are counting, reading everything at once keeps the program simple.</li>
-    <li><strong><code>&amp;path</code></strong> — The <code>&amp;</code> passes the function a <em>borrowed view</em> of <code>path</code> instead of handing the value over. The function only needs to read the path, so a borrow is enough, and <code>path</code> stays usable afterward. The blue callout below connects this to the ownership rule from the primer.</li>
-    <li><strong><code>.expect("could not read file")</code></strong> — Reading a file can fail for ordinary reasons: the file may not exist, or you may lack permission. As with the argument in Step 1, the read does not return a plain <code>String</code> — it returns a value that is either the contents or an error, and <code>.expect</code> takes the contents or, on failure, stops the program with this message. (Lesson 2 replaces this with proper error handling.)</li>
-    <li><strong><code>print!</code> (no <code>ln</code>)</strong> — Prints its text with no trailing newline added. We use <code>print!</code> rather than <code>println!</code> here because the file's contents already end in a newline, and we do not want to add a second blank line.</li>
+    <li><strong><code>fs::read_to_string(&amp;path)</code></strong> opens the file at <code>path</code> and reads its entire contents into a single <code>String</code> in memory. For the files we are counting, reading everything at once keeps the program simple.</li>
+    <li><strong><code>&amp;path</code></strong>: the <code>&amp;</code> passes the function a <em>borrowed view</em> of <code>path</code> instead of handing the value over. The function only needs to read the path, so a borrow is enough, and <code>path</code> stays usable afterward. The blue callout below connects this to the ownership rule from the primer.</li>
+    <li><strong><code>.expect("could not read file")</code></strong>: reading a file can fail for ordinary reasons. The file may not exist, or you may lack permission. As with the argument in Step 1, the read does not return a plain <code>String</code>. It returns a value that is either the contents or an error, and <code>.expect</code> takes the contents or, on failure, stops the program with this message. (Lesson 2 replaces this with proper error handling.)</li>
+    <li><strong><code>print!</code> (no <code>ln</code>)</strong> prints its text with no trailing newline added. We use <code>print!</code> rather than <code>println!</code> here because the file's contents already end in a newline, and we do not want to add a second blank line.</li>
   </ul>
   <pre class="shell"><code>cargo run -- ../MISSION.md   <span class="c"># dumps the file back at you</span>
 cargo run -- nope.txt        <span class="c"># crashes: could not read file</span></code></pre>
@@ -103,20 +103,20 @@ fn main() {
 
 <span class="add">    println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");</span>
 }</code></pre>
-  <p>What the new lines do — each builds on the iterator idea from Step 1:</p>
+  <p>What the new lines do (each builds on the iterator idea from Step 1):</p>
   <ul>
-    <li><strong><code>text.lines()</code></strong> — Gives an iterator that yields the text one line at a time. On its own it counts nothing; chaining <code>.count()</code> walks the whole iterator and returns how many items it produced — here, the number of lines.</li>
-    <li><strong><code>text.split_whitespace()</code></strong> — Gives an iterator over the runs of non-whitespace between spaces, tabs, and newlines — in other words, the words. <code>.count()</code> then tallies them. This matches how <code>wc</code> defines a "word."</li>
-    <li><strong><code>text.chars()</code></strong> — Gives an iterator over the text's characters (Unicode scalar values), and <code>.count()</code> tallies those. The callout below explains why this counts characters rather than bytes.</li>
-    <li><strong><code>{lines:&gt;6}</code></strong> — Inside the format string, this is the same <code>{variable}</code> interpolation as before, plus a <em>format specifier</em> after the colon. <code>&gt;6</code> means "right-align this value in a field at least 6 characters wide," which lines the three numbers up into neat columns the way <code>wc</code> does.</li>
+    <li><strong><code>text.lines()</code></strong> gives an iterator that yields the text one line at a time. On its own it counts nothing; chaining <code>.count()</code> walks the whole iterator and returns how many items it produced, here the number of lines.</li>
+    <li><strong><code>text.split_whitespace()</code></strong> gives an iterator over the runs of non-whitespace between spaces, tabs, and newlines: in other words, the words. <code>.count()</code> then tallies them. This matches how <code>wc</code> defines a "word."</li>
+    <li><strong><code>text.chars()</code></strong> gives an iterator over the text's characters (Unicode scalar values), and <code>.count()</code> tallies those. The callout below explains why this counts characters rather than bytes.</li>
+    <li><strong><code>{lines:&gt;6}</code></strong>: inside the format string, this is the same <code>{variable}</code> interpolation as before, plus a <em>format specifier</em> after the colon. <code>&gt;6</code> means "right-align this value in a field at least 6 characters wide," which lines the three numbers up into neat columns the way <code>wc</code> does.</li>
   </ul>
   <pre class="shell"><code>cargo run -- ../MISSION.md</code></pre>
-  <p>Compare against the reference implementation — lines and words should match exactly:</p>
+  <p>Compare against the reference implementation. Lines and words should match exactly:</p>
   <pre class="shell"><code>wc ../MISSION.md   <span class="c"># prints: lines words bytes</span></code></pre>
 
   <div class="note">
     <span class="label">Why <code>.chars().count()</code>, not <code>.len()</code></span>
-    <code>text.len()</code> returns <em>bytes</em>, not characters. Rust strings are UTF-8, where one character may span several bytes — <code>"வணக்கம்"</code> from your <code>hello2</code> project is far more bytes than characters. <code>.chars()</code> counts characters. Because <code>wc</code> counts bytes by default, its final column exceeds your <code>chars</code> column on any file containing non-ASCII text (em-dashes, accents, Tamil, Hindi). The two tools are measuring different things — even <code>MISSION.md</code> shows a small gap, because its <code>—</code> dashes are 3 bytes each.
+    <code>text.len()</code> returns <em>bytes</em>, not characters. Rust strings are UTF-8, where one character may span several bytes: <code>"வணக்கம்"</code> from your <code>hello2</code> project is far more bytes than characters. <code>.chars()</code> counts characters. Because <code>wc</code> counts bytes by default, its final column exceeds your <code>chars</code> column on any file containing non-ASCII text (em-dashes, accents, Tamil, Hindi). The two tools are measuring different things. Even <code>MISSION.md</code> shows a small gap, because its <code>—</code> dashes are 3 bytes each.
   </div>
 
   <div class="win">
@@ -162,10 +162,10 @@ fn main() {
   </div>
 
   <h2>Primary source</h2>
-  <p>The official, current guide to Rust CLIs — begin with the 15-minute tutorial, which builds a comparable tool: <a href="https://rust-cli.github.io/book/tutorial/index.html"><strong>Command Line Applications in Rust — Tutorial</strong></a>. For the string methods used here, the <a href="https://doc.rust-lang.org/std/primitive.str.html"><code>str</code> standard-library documentation</a> lists every iterator a string provides.</p>
+  <p>The official, current guide to Rust CLIs. Begin with the 15-minute tutorial, which builds a comparable tool: <a href="https://rust-cli.github.io/book/tutorial/index.html"><strong>Command Line Applications in Rust — Tutorial</strong></a>. For the string methods used here, the <a href="https://doc.rust-lang.org/std/primitive.str.html"><code>str</code> standard-library documentation</a> lists every iterator a string provides.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> Paste your <code>cargo run</code> output or any compiler error and we will work through it together — Rust's diagnostics are worth reading closely. When the tool runs, the next step is Lesson 2: graceful error handling — clean messages and exit codes.
+    <strong>Questions are welcome.</strong> Paste your <code>cargo run</code> output or any compiler error and we will work through it together. Rust's diagnostics are worth reading closely. When the tool runs, the next step is Lesson 2: graceful error handling with clean messages and exit codes.
   </div>
 
   <div class="lesson-foot">

@@ -13,7 +13,7 @@
 
   <div class="note">
     <span class="label">How to use this primer</span>
-    This is the only theory the course front-loads — read it once for the mental model, then start building in <a href="./0001-build-rwc-cli.html">Lesson 1</a>. You do <em>not</em> need to master borrowing, lifetimes, or the borrow checker here; each is taught when a project first needs it (Modules 2 onward). This is orientation, not a lesson to complete.
+    This is the only theory the course front-loads. Read it once for the mental model, then start building in <a href="./0001-build-rwc-cli.html">Lesson 1</a>. You do <em>not</em> need to master borrowing, lifetimes, or the borrow checker here; each is taught when a project first needs it (Modules 2 onward). This is orientation, not a lesson to complete.
   </div>
 
   <h2>What this primer covers</h2>
@@ -28,9 +28,9 @@
   <h2>The problem ownership solves</h2>
   <p>Every language has to answer one question: who frees a value's memory, and when? The three common answers:</p>
   <ul>
-    <li><strong>C</strong> — the programmer, by hand (<code>free</code>). Miss it and you leak; do it twice and you corrupt the heap.</li>
-    <li><strong>Go</strong> — a garbage collector, at runtime, at a time it chooses.</li>
-    <li><strong>Rust</strong> — the compiler, at compile time, using a rule called <em>ownership</em>. No GC, no manual <code>free</code>, no runtime cost.</li>
+    <li><strong>C</strong>: the programmer, by hand (<code>free</code>). Miss it and you leak; do it twice and you corrupt the heap.</li>
+    <li><strong>Go</strong>: a garbage collector, at runtime, at a time it chooses.</li>
+    <li><strong>Rust</strong>: the compiler, at compile time, using a rule called <em>ownership</em>. There is no GC and no manual <code>free</code>, and it costs nothing at runtime.</li>
   </ul>
   <p>This is the feature that distinguishes Rust. The borrow checker you may have heard about is simply ownership being enforced.</p>
 
@@ -41,7 +41,7 @@
     <li>There can only be <strong>one owner at a time</strong>.</li>
     <li>When the owner goes <strong>out of scope</strong>, the value is dropped (freed).</li>
   </ol>
-  <p>Rule 3 is the automatic <code>free</code>: at the closing <code>}</code>, the compiler inserts the cleanup (see <a href="../reference/glossary.html">Drop</a>) deterministically — not "eventually".</p>
+  <p>Rule 3 is the automatic <code>free</code>: at the closing <code>}</code>, the compiler inserts the cleanup (see <a href="../reference/glossary.html">Drop</a>) deterministically, not "eventually".</p>
 
   <pre><code>fn main() {
     let s = String::from("hello"); <span class="c">// s owns heap-allocated text</span>
@@ -49,21 +49,21 @@
 }                                  <span class="c">// scope ends → s is dropped, memory freed</span></code></pre>
 
   <h2>Moves: why assignment can invalidate a value</h2>
-  <p>A <code>String</code> is a three-field handle on the stack — <em>pointer, length, capacity</em> — referring to text on the heap. Consider:</p>
+  <p>A <code>String</code> is a three-field handle on the stack (<em>pointer, length, capacity</em>) referring to text on the heap. Consider:</p>
 
   <pre><code>let s1 = String::from("hello");
 let s2 = s1;          <span class="c">// the handle is copied; the heap text is NOT</span>
 println!("{s1}");     <span class="err">// ❌ error[E0382]: borrow of moved value: `s1`</span></code></pre>
 
-  <p>If both <code>s1</code> and <code>s2</code> remained valid, both would free the same heap buffer at scope end — a double free, the classic C defect. Rust's resolution follows from rule 2 (one owner): the assignment <strong>moves</strong> ownership to <code>s2</code> and marks <code>s1</code> invalid. Any later use of <code>s1</code> is a compile error.</p>
+  <p>If both <code>s1</code> and <code>s2</code> remained valid, both would free the same heap buffer at scope end: a double free, the classic C defect. Rust's resolution follows from rule 2 (one owner): the assignment <strong>moves</strong> ownership to <code>s2</code> and marks <code>s1</code> invalid. Any later use of <code>s1</code> is a compile error.</p>
 
   <div class="compare">
     <span class="label">Comparison: the same line in C, Go, and Rust</span>
     Given <code>b = a;</code> where <code>a</code> holds a string:
     <ul style="margin:0.4rem 0 0;">
-      <li><strong>C</strong> — shallow pointer copy; both refer to one buffer; avoiding the double free is your responsibility.</li>
-      <li><strong>Go</strong> — both reference the same backing array; the GC frees it once nothing points at it.</li>
-      <li><strong>Rust</strong> — <code>a</code> is moved into <code>b</code> and becomes unusable; the double free is impossible by construction, verified before the program runs.</li>
+      <li><strong>C</strong>: shallow pointer copy; both refer to one buffer; avoiding the double free is your responsibility.</li>
+      <li><strong>Go</strong>: both reference the same backing array; the GC frees it once nothing points at it.</li>
+      <li><strong>Rust</strong>: <code>a</code> is moved into <code>b</code> and becomes unusable; the double free is impossible by construction, verified before the program runs.</li>
     </ul>
   </div>
 
@@ -84,9 +84,9 @@ println!("{x} {y}");  <span class="c">// ✓ fine — i32 is Copy, x is still va
     <span class="label">Two escape hatches</span>
     <ul style="margin:0.3rem 0 0;">
       <li>Need both bindings to own the data? Call <code>a.clone()</code> for an explicit deep copy.</li>
-      <li>Need to use a value without taking it? <em>Borrow</em> it with <code>&amp;a</code> — you'll do this in <a href="./0001-build-rwc-cli.html">Lesson 1</a>, where reading a file uses <code>&amp;path</code>.</li>
+      <li>Need to use a value without taking it? <em>Borrow</em> it with <code>&amp;a</code>. You'll do this in <a href="./0001-build-rwc-cli.html">Lesson 1</a>, where reading a file uses <code>&amp;path</code>.</li>
     </ul>
-    Rust never clones implicitly: copies you did not request do not happen.
+    Rust never clones implicitly: a deep copy happens only when you ask for one.
   </div>
 
   <h2>Check your understanding</h2>
@@ -97,7 +97,7 @@ println!("{x} {y}");  <span class="c">// ✓ fine — i32 is Copy, x is still va
     <button class="quiz-opt" data-correct>Invalid; using it fails to compile</button>
     <button class="quiz-opt">Valid; it shares the buffer</button>
     <button class="quiz-opt">Valid; it was deep copied</button>
-    <p class="quiz-fb ok" hidden>The assignment moved ownership to b, so a is invalidated at compile time — no double free is possible.</p>
+    <p class="quiz-fb ok" hidden>The assignment moved ownership to b, so a is invalidated at compile time and no double free is possible.</p>
     <p class="quiz-fb no" hidden>That is the C/Go behaviour. Rust moves the String: a becomes invalid and any later use is a compile error.</p>
   </div>
 
@@ -115,15 +115,15 @@ println!("{x} {y}");  <span class="c">// ✓ fine — i32 is Copy, x is still va
     <button class="quiz-opt" data-correct>Compiler-inserted drop, at scope end</button>
     <button class="quiz-opt">A garbage collector, at runtime</button>
     <button class="quiz-opt">The programmer, calling free</button>
-    <p class="quiz-fb ok" hidden>Rule 3: when the owner leaves scope, Rust runs drop automatically and deterministically — no GC, no manual free.</p>
-    <p class="quiz-fb no" hidden>Neither — that's Go and C respectively. Rust frees deterministically at scope end via compiler-inserted drop.</p>
+    <p class="quiz-fb ok" hidden>Rule 3: when the owner leaves scope, Rust runs drop automatically and deterministically, with no GC and no manual free.</p>
+    <p class="quiz-fb no" hidden>Neither. That's Go and C respectively. Rust frees deterministically at scope end via compiler-inserted drop.</p>
   </div>
 
   <h2>Primary source</h2>
-  <p>Read this once — it is the authoritative explanation and includes the stack/heap diagrams (~15 min): <a href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html"><strong>The Rust Book, Ch. 4.1 — "What Is Ownership?"</strong></a></p>
+  <p>Read this once. It is the authoritative explanation and includes the stack/heap diagrams (~15 min): <a href="https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html"><strong>The Rust Book, Ch. 4.1 — "What Is Ownership?"</strong></a></p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> If you want to know why <code>Copy</code> and <code>Clone</code> are separate traits, or how ownership interacts with function calls and return values, ask in the chat — and revisit this primer anytime the borrow checker surprises you.
+    <strong>Questions are welcome.</strong> If you want to know why <code>Copy</code> and <code>Clone</code> are separate traits, or how ownership interacts with function calls and return values, ask in the chat. And revisit this primer anytime the borrow checker surprises you.
   </div>
 
   <div class="lesson-foot">

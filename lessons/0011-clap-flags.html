@@ -9,7 +9,7 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Lesson 11 · Build-along</p>
   <h1>Flags with clap (derive)</h1>
-  <p class="subtitle">Lesson 10 gave <code>rwc</code> its first dependency. This lesson adds its second — <a href="https://crates.io/crates/clap"><code>clap</code></a>, the standard crate for command-line parsing — and uses it to let the user pick <em>which</em> counts to print. Right now <code>rwc</code> prints all five columns every time; real tools like <code>wc</code> let you ask for just what you want (<code>wc -l</code> for lines, <code>-w</code> for words). You describe the command line as a <code>struct</code> with <code>#[derive(Parser)]</code> — the same struct-plus-<code>derive</code> pattern you used for <code>Counts</code> — and clap generates the parser, the <code>--help</code>, the <code>--version</code>, and the input validation from the field types. The anchoring feature: <code>--lines</code>/<code>--words</code>/<code>--bytes</code>/<code>--chars</code>/<code>--graphemes</code> flags that select columns.</p>
+  <p class="subtitle">Lesson 10 gave <code>rwc</code> its first dependency. This lesson adds its second, <a href="https://crates.io/crates/clap"><code>clap</code></a>, the standard crate for command-line parsing, and uses it to let the user pick <em>which</em> counts to print. Right now <code>rwc</code> prints all five columns every time; real tools like <code>wc</code> let you ask for just what you want (<code>wc -l</code> for lines, <code>-w</code> for words). You describe the command line as a <code>struct</code> with <code>#[derive(Parser)]</code> (the same struct-plus-<code>derive</code> pattern you used for <code>Counts</code>) and clap generates the parser, the <code>--help</code>, the <code>--version</code>, and the input validation from the field types. The anchoring feature: <code>--lines</code>/<code>--words</code>/<code>--bytes</code>/<code>--chars</code>/<code>--graphemes</code> flags that select columns.</p>
 
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
@@ -17,25 +17,25 @@
     <li>Add a dependency with a non-default <em>feature</em> (<code>cargo add clap --features derive</code>) and read the table-form entry in <code>Cargo.toml</code>.</li>
     <li>Define a CLI as a <code>#[derive(Parser)]</code> struct: boolean <code>#[arg(short, long)]</code> flags and a positional <code>Vec&lt;String&gt;</code>.</li>
     <li>Parse arguments with <code>Cli::parse()</code>, replacing the hand-rolled <code>env::args</code> wiring.</li>
-    <li>Explain what clap generates for free — <code>--help</code>, <code>--version</code>, and a usage error with a non-zero exit code.</li>
+    <li>Explain what clap generates for free: <code>--help</code>, <code>--version</code>, and a usage error with a non-zero exit code.</li>
     <li>See how one <code>cargo add</code> pulled in a tree of <em>transitive</em> dependencies, and inspect it with <code>cargo tree</code>.</li>
   </ul>
 
   <div class="note">
     <span class="label">Starting point</span>
-    Work in <code>0011-rwc/</code>, a clean copy of your finished Lesson 10 tool — <code>Counts</code> with five fields, <code>Report&lt;'a&gt;</code>, <code>Source</code>, the <code>unicode-segmentation</code> dependency, and <code>rust-toolchain.toml</code>, tests green. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write — attempt it, then open <em>Show solution</em> to check.
+    Work in <code>0011-rwc/</code>, a clean copy of your finished Lesson 10 tool: <code>Counts</code> with five fields, <code>Report&lt;'a&gt;</code>, <code>Source</code>, the <code>unicode-segmentation</code> dependency, and <code>rust-toolchain.toml</code>, tests green. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write. Attempt it, then open <em>Show solution</em> to check.
   </div>
 
   <h2>Why clap, why now</h2>
-  <p>Your argument handling so far is hand-rolled: <code>env::args().skip(1).collect()</code> feeds <code>Source::from_args</code>, which only tells files from <code>-</code> and rejects anything else starting with a dash. Add real flags to that by hand and it grows fast — you would have to parse <code>-l</code>, combined short flags like <code>-lw</code>, long forms like <code>--words</code>, print a <code>--help</code> screen, emit a usage error on a typo, and support <code>--version</code>. <code>clap</code> does all of it, and its derive API is something you can already read:</p>
+  <p>Your argument handling so far is hand-rolled: <code>env::args().skip(1).collect()</code> feeds <code>Source::from_args</code>, which only tells files from <code>-</code> and rejects anything else starting with a dash. Add real flags to that by hand and it grows fast: you would have to parse <code>-l</code>, combined short flags like <code>-lw</code>, long forms like <code>--words</code>, print a <code>--help</code> screen, emit a usage error on a typo, and support <code>--version</code>. <code>clap</code> does all of it, and its derive API is something you can already read:</p>
   <ul>
-    <li>You describe the command line as a <code>struct</code> and put <code>#[derive(Parser)]</code> on it — the same mechanism that gives <code>Counts</code> its <code>Debug</code> and <code>Copy</code>.</li>
+    <li>You describe the command line as a <code>struct</code> and put <code>#[derive(Parser)]</code> on it, the same mechanism that gives <code>Counts</code> its <code>Debug</code> and <code>Copy</code>.</li>
     <li>Each field is one argument. A <code>bool</code> field is a flag; a <code>Vec&lt;String&gt;</code> field collects positional arguments.</li>
     <li>The doc comment on each field becomes its help text. clap generates the parser, <code>--help</code>, and validation from the types.</li>
   </ul>
 
   <h2>Step 1 — Add clap with a feature</h2>
-  <p>clap ships most of its machinery behind <em>features</em> — optional, additive parts of a crate you turn on in <code>Cargo.toml</code>. The derive API (the <code>#[derive(Parser)]</code> macro) lives behind the <code>derive</code> feature, so you ask for it explicitly:</p>
+  <p>clap ships most of its machinery behind <em>features</em>: optional, additive parts of a crate you turn on in <code>Cargo.toml</code>. The derive API (the <code>#[derive(Parser)]</code> macro) lives behind the <code>derive</code> feature, so you ask for it explicitly:</p>
   <pre class="shell"><code>cargo add clap --features derive</code></pre>
   <pre class="shell"><code>      Adding clap v4.6.1 to dependencies
              Features:
@@ -49,7 +49,7 @@
   <pre><code>[dependencies]
 <span class="add">clap = { version = "4.6.1", features = ["derive"] }</span>
 unicode-segmentation = "1.13.3"</code></pre>
-  <p>The version still follows the caret rule from Lesson 10 (<code>"4.6.1"</code> means <code>&gt;=4.6.1, &lt;5.0.0</code>); the <code>features</code> array is what turns on the derive macro. Notice the terminal said it added <em>20</em> packages, not one. clap depends on other crates, which depend on still others — <strong>transitive dependencies</strong>. <code>cargo tree</code> shows the whole subtree one <code>cargo add</code> brought in:</p>
+  <p>The version still follows the caret rule from Lesson 10 (<code>"4.6.1"</code> means <code>&gt;=4.6.1, &lt;5.0.0</code>); the <code>features</code> array is what turns on the derive macro. Notice the terminal said it added <em>20</em> packages, not one. clap depends on other crates, which depend on still others: <strong>transitive dependencies</strong>. <code>cargo tree</code> shows the whole subtree one <code>cargo add</code> brought in:</p>
   <pre class="shell"><code>cargo tree</code></pre>
   <pre class="shell"><code>rwc v0.1.0 (/…/0011-rwc)
 ├── clap v4.6.1
@@ -66,7 +66,7 @@ unicode-segmentation = "1.13.3"</code></pre>
 │       ├── quote v1.0.46
 │       └── syn v2.0.118
 └── unicode-segmentation v1.13.3</code></pre>
-  <p>The lockfile now pins 23 packages instead of two. This is the deal with dependencies: one line in <code>Cargo.toml</code> can be a large amount of code you did not write — convenient, and worth being aware of. <code>Cargo.lock</code> (Lesson 10) pins every one of them for reproducible builds.</p>
+  <p>The lockfile now pins 23 packages instead of two. This is the deal with dependencies: one line in <code>Cargo.toml</code> can be a large amount of code you did not write. That is convenient, and worth being aware of. <code>Cargo.lock</code> (Lesson 10) pins every one of them for reproducible builds.</p>
 
   <h2>Step 2 — Describe the CLI as a struct</h2>
   <p>Bring the derive macro into scope and describe the whole command line as one struct. Put this at the top of <code>main.rs</code>. The <code>#[command(...)]</code> attribute configures the program (<code>version</code> reads your <code>Cargo.toml</code> version; <code>about</code> uses the struct's doc comment); each field's <code>#[arg(...)]</code> configures one argument.</p>
@@ -74,7 +74,7 @@ unicode-segmentation = "1.13.3"</code></pre>
 use rwc::{Counts, Report, Source};
 use std::env;
 use std::error::Error;</code></pre>
-  <p>The <code>#[arg(short, long)]</code> on a <code>bool</code> field makes a flag with both a short form (<code>-l</code>, the first letter of the field) and a long form (<code>--lines</code>). When the first letter clashes or isn't the conventional one — <code>wc</code> uses <code>-c</code> for bytes and <code>-m</code> for chars — you set the short letter explicitly with <code>short = 'c'</code>.</p>
+  <p>The <code>#[arg(short, long)]</code> on a <code>bool</code> field makes a flag with both a short form (<code>-l</code>, the first letter of the field) and a long form (<code>--lines</code>). When the first letter clashes or isn't the conventional one (<code>wc</code> uses <code>-c</code> for bytes and <code>-m</code> for chars), you set the short letter explicitly with <code>short = 'c'</code>.</p>
   <pre><code><span class="c">// main.rs — add this above `fn main`</span>
 <span class="add">/// Count lines, words, bytes, characters, and graphemes.</span>
 <span class="add">///</span>
@@ -111,7 +111,7 @@ use std::error::Error;</code></pre>
     #[arg(short = 'g', long)]
     graphemes: bool,</code></pre>
   </details>
-  <p>The final field, <code>paths</code>, has no <code>#[arg]</code> attribute and is not a <code>bool</code> — so clap treats it as a <em>positional</em> argument, and because it is a <code>Vec</code> it collects <em>all</em> the leftover non-flag arguments (the file names). That is exactly the <code>Vec&lt;String&gt;</code> your <code>Source::from_args</code> already expects.</p>
+  <p>The final field, <code>paths</code>, has no <code>#[arg]</code> attribute and is not a <code>bool</code>, so clap treats it as a <em>positional</em> argument, and because it is a <code>Vec</code> it collects <em>all</em> the leftover non-flag arguments (the file names). That is exactly the <code>Vec&lt;String&gt;</code> your <code>Source::from_args</code> already expects.</p>
 
   <h2>Step 3 — Select columns in the library</h2>
   <p>The flags decide which columns print. Keep that decision in the library, as a small type, so <code>main</code> stays thin and the formatting stays in <code>Report</code>. Add a <code>Columns</code> struct near <code>Report</code> in <code>lib.rs</code>: five booleans and two constructors. <code>all()</code> turns everything on; <code>from_flags</code> maps the CLI flags, defaulting to <code>all()</code> when the user passes none.</p>
@@ -184,7 +184,7 @@ use std::error::Error;</code></pre>
         }
     }</code></pre>
   </details>
-  <p>Now teach <code>Report::line</code> to honour the selection. In Lesson 10 it was one <code>format!</code> with a fixed five-column string. It becomes: build a <code>Vec</code> of the columns that are turned on, then join them with a space. Update its doc-test too — <code>line</code> now takes a <code>&amp;Columns</code>.</p>
+  <p>Now teach <code>Report::line</code> to honour the selection. In Lesson 10 it was one <code>format!</code> with a fixed five-column string. It becomes: build a <code>Vec</code> of the columns that are turned on, then join them with a space. Update its doc-test too: <code>line</code> now takes a <code>&amp;Columns</code>.</p>
   <pre><code>    <span class="c">/// Formats the report as one output row: the selected counts, then the label.</span>
     /// ```
     /// use rwc::{Columns, Counts, Report};
@@ -219,7 +219,7 @@ use std::error::Error;</code></pre>
             parts.push(format!("{:&gt;6}", self.counts.graphemes));
         }</code></pre>
   </details>
-  <p>One existing test called <code>report.line()</code> with no argument — update it to pass a selection. And add a test that the selection actually filters. <strong>Your turn</strong> — write the filtering test, mirroring the doc-test above:</p>
+  <p>One existing test called <code>report.line()</code> with no argument; update it to pass a selection. And add a test that the selection actually filters. <strong>Your turn.</strong> Write the filtering test, mirroring the doc-test above:</p>
   <pre><code>    #[test]
     fn report_borrows_label_and_holds_counts() {
         <span class="c">// ... unchanged setup and assertions ...</span>
@@ -243,7 +243,7 @@ use std::error::Error;</code></pre>
   </details>
 
   <h2>Step 4 — Wire clap into <code>main</code></h2>
-  <p>Now replace the hand-rolled parsing. <code>Cli::parse()</code> reads the process arguments, applies everything the struct declared, and — on <code>--help</code>, <code>--version</code>, or a bad argument — prints and exits for you. The old <code>env::args</code> line and its <code>use std::env;</code> go away; import <code>Columns</code> from the library.</p>
+  <p>Now replace the hand-rolled parsing. <code>Cli::parse()</code> reads the process arguments, applies everything the struct declared, and, on <code>--help</code>, <code>--version</code>, or a bad argument, prints and exits for you. The old <code>env::args</code> line and its <code>use std::env;</code> go away; import <code>Columns</code> from the library.</p>
   <pre><code>use clap::Parser;
 <span class="add">use rwc::{Columns, Counts, Report, Source};</span>
 use std::error::Error;</code></pre>
@@ -268,7 +268,7 @@ use std::error::Error;</code></pre>
     <summary>Show solution</summary>
     <pre><code>    let cols = Columns::from_flags(cli.lines, cli.words, cli.bytes, cli.chars, cli.graphemes);</code></pre>
   </details>
-  <p>Both <code>println!</code> calls now pass <code>&amp;cols</code>. <code>main</code> stayed thin: it maps flags to a <code>Columns</code> and hands it to <code>Report</code>, which still owns the formatting — the same division of labour you set up in Lesson 9.</p>
+  <p>Both <code>println!</code> calls now pass <code>&amp;cols</code>. <code>main</code> stayed thin: it maps flags to a <code>Columns</code> and hands it to <code>Report</code>, which still owns the formatting, the same division of labour you set up in Lesson 9.</p>
 
   <h2>Step 5 — What clap gave you for free</h2>
   <p>You wrote a struct; clap generated a whole CLI. <code>--help</code> is built from the <code>#[command]</code> about text and every field's doc comment:</p>
@@ -291,7 +291,7 @@ Options:
   <p><code>--version</code> comes from <code>#[command(version)]</code>, which reads <code>Cargo.toml</code>:</p>
   <pre class="shell"><code>cargo run -- --version</code></pre>
   <pre class="shell"><code>rwc 0.1.0</code></pre>
-  <p>And an unknown flag is rejected with a usage message on <em>stderr</em> and a non-zero exit code — validation you did not write:</p>
+  <p>And an unknown flag is rejected with a usage message on <em>stderr</em> and a non-zero exit code, validation you did not write:</p>
   <pre class="shell"><code>cargo run -- --nope demo.txt</code></pre>
   <pre class="shell"><code>error: unexpected argument '--nope' found
 
@@ -300,7 +300,7 @@ Options:
 Usage: rwc [OPTIONS] [PATHS]...
 
 For more information, try '--help'.</code></pre>
-  <p>Note clap added <code>-h</code>/<code>--help</code> and <code>-V</code>/<code>--version</code> itself — that is why <code>version</code> uses a capital <code>-V</code>, leaving lowercase <code>-v</code> free for a future <code>--verbose</code>.</p>
+  <p>Note clap added <code>-h</code>/<code>--help</code> and <code>-V</code>/<code>--version</code> itself. That is why <code>version</code> uses a capital <code>-V</code>, leaving lowercase <code>-v</code> free for a future <code>--verbose</code>.</p>
 
   <h2>Run it</h2>
   <p>Tests first. Two new unit tests (<code>columns_default_to_all_when_none_set</code>, <code>line_prints_only_selected_columns</code>) bring the unit suite to <strong>14</strong>, and the new <code>Columns</code> doc-test brings doc-tests to <strong>12</strong>:</p>
@@ -328,7 +328,7 @@ cargo run -- demo.txt combining.txt</code></pre>
   <pre class="shell"><code>     3      6 demo.txt
      1      7 combining.txt
      4     13 total</code></pre>
-  <p>Short flags combine, too — <code>-lg</code> is <code>-l -g</code>:</p>
+  <p>Short flags combine, too: <code>-lg</code> is <code>-l -g</code>:</p>
   <pre class="shell"><code>cargo run -- -lg demo.txt combining.txt</code></pre>
   <pre class="shell"><code>     1      6 demo.txt
      1      5 combining.txt
@@ -336,14 +336,14 @@ cargo run -- demo.txt combining.txt</code></pre>
 
   <div class="win">
     <span class="label">Outcome</span>
-    <code>rwc</code> is now a flag-driven tool. You added <code>clap</code> with its <code>derive</code> feature, described the whole command line as a <code>#[derive(Parser)]</code> struct, and got a parser, <code>--help</code>, <code>--version</code>, and input validation generated from the field types. A small <code>Columns</code> type carries the selection from <code>main</code> into <code>Report::line</code>, keeping <code>main</code> thin and the formatting in one place. You also saw one <code>cargo add</code> pull in a tree of transitive dependencies — the real cost and convenience of the ecosystem.
+    <code>rwc</code> is now a flag-driven tool. You added <code>clap</code> with its <code>derive</code> feature, described the whole command line as a <code>#[derive(Parser)]</code> struct, and got a parser, <code>--help</code>, <code>--version</code>, and input validation generated from the field types. A small <code>Columns</code> type carries the selection from <code>main</code> into <code>Report::line</code>, keeping <code>main</code> thin and the formatting in one place. You also saw one <code>cargo add</code> pull in a tree of transitive dependencies, the real cost and convenience of the ecosystem.
   </div>
 
   <h2>Optional extensions</h2>
   <ol>
-    <li><strong>Add <code>--verbose</code>.</strong> Add a <code>#[arg(short, long)] verbose: bool</code> field and print the resolved <code>Columns</code> to stderr when it is set. Notice clap gives it <code>-v</code> automatically — the letter it kept free by using <code>-V</code> for version.</li>
+    <li><strong>Add <code>--verbose</code>.</strong> Add a <code>#[arg(short, long)] verbose: bool</code> field and print the resolved <code>Columns</code> to stderr when it is set. Notice clap gives it <code>-v</code> automatically, the letter it kept free by using <code>-V</code> for version.</li>
     <li><strong>Header row.</strong> Add a <code>--header</code> flag that prints a column-title row (<code>lines words …</code>) matching the selected columns before the counts. Reuse the same <code>Columns</code> to decide which titles to show.</li>
-    <li><strong>Read the generated help harder.</strong> Run <code>cargo run -- -h</code> vs <code>--help</code> and compare; add a <code>#[command(long_about = "…")]</code> and see where the longer text appears. This is all driven by the attributes — no output code of your own.</li>
+    <li><strong>Read the generated help harder.</strong> Run <code>cargo run -- -h</code> vs <code>--help</code> and compare; add a <code>#[command(long_about = "…")]</code> and see where the longer text appears. The attributes drive all of it; you write no output code of your own.</li>
     <li><strong>Trim the tree.</strong> Run <code>cargo tree -e no-dev</code> and <code>cargo tree -d</code> (duplicates). clap is a big dependency; some projects use lighter parsers (<code>lexopt</code>, <code>pico-args</code>) when binary size matters. Weigh the trade-off.</li>
   </ol>
 
@@ -351,19 +351,19 @@ cargo run -- demo.txt combining.txt</code></pre>
   <div class="quiz">
     <p class="quiz-q">In the <code>Cli</code> struct, why does the <code>paths</code> field become a <em>positional</em> argument while <code>lines</code> becomes a flag?</p>
     <button class="quiz-opt" data-correct><code>paths</code> has no <code>#[arg(short, long)]</code> and is a <code>Vec&lt;String&gt;</code>, so clap collects the non-flag arguments into it; <code>lines</code> is a <code>bool</code> with <code>short</code>/<code>long</code>, so it is a switch</button>
-    <button class="quiz-opt">Field order decides it — the last field is always positional</button>
+    <button class="quiz-opt">Field order decides it: the last field is always positional</button>
     <button class="quiz-opt">Positional vs flag is set by the field name; <code>paths</code> is a reserved name in clap</button>
-    <p class="quiz-fb ok" hidden>Right — clap reads the type and attributes. A <code>bool</code> with <code>#[arg(short, long)]</code> is a flag; a field without <code>short</code>/<code>long</code> is positional, and a <code>Vec</code> collects all the leftover values. Neither name nor position is what decides it.</p>
+    <p class="quiz-fb ok" hidden>Right. clap reads the type and attributes. A <code>bool</code> with <code>#[arg(short, long)]</code> is a flag; a field without <code>short</code>/<code>long</code> is positional, and a <code>Vec</code> collects all the leftover values. Neither name nor position is what decides it.</p>
     <p class="quiz-fb no" hidden>It is the type and attributes, not the name or ordering. <code>#[arg(short, long)]</code> on a <code>bool</code> makes a flag; a field with no <code>short</code>/<code>long</code> is positional, and a <code>Vec&lt;String&gt;</code> gathers every leftover argument.</p>
   </div>
 
   <div class="quiz">
     <p class="quiz-q">You ran <code>cargo add clap --features derive</code> and <code>cargo tree</code> shows 20-plus extra crates. What are those?</p>
-    <button class="quiz-opt" data-correct>Transitive dependencies — crates that clap (and its dependencies) depend on, pulled in automatically</button>
+    <button class="quiz-opt" data-correct>Transitive dependencies: crates that clap (and its dependencies) depend on, pulled in automatically</button>
     <button class="quiz-opt">Optional features of clap you accidentally enabled and should remove</button>
     <button class="quiz-opt">Copies of clap for each platform you might build on</button>
-    <p class="quiz-fb ok" hidden>Right — a dependency's own dependencies come along transitively. One <code>cargo add</code> can pull in a whole subtree; <code>cargo tree</code> shows it, and <code>Cargo.lock</code> pins every crate in it.</p>
-    <p class="quiz-fb no" hidden>They are transitive dependencies — the crates clap itself depends on (and theirs, in turn). They are not stray features or per-platform copies; <code>cargo tree</code> shows the real subtree that one <code>cargo add</code> brought in.</p>
+    <p class="quiz-fb ok" hidden>Right. A dependency's own dependencies come along transitively. One <code>cargo add</code> can pull in a whole subtree; <code>cargo tree</code> shows it, and <code>Cargo.lock</code> pins every crate in it.</p>
+    <p class="quiz-fb no" hidden>They are transitive dependencies: the crates clap itself depends on (and theirs, in turn). They are not stray features or per-platform copies; <code>cargo tree</code> shows the real subtree that one <code>cargo add</code> brought in.</p>
   </div>
 
   <div class="quiz">
@@ -371,7 +371,7 @@ cargo run -- demo.txt combining.txt</code></pre>
     <button class="quiz-opt" data-correct>clap generates it from the <code>#[command]</code> about and each field's <code>///</code> doc comment</button>
     <button class="quiz-opt">You have to write a <code>print_help()</code> function and call it when <code>-h</code> is passed</button>
     <button class="quiz-opt">It is read at runtime from a <code>help.txt</code> file next to the binary</button>
-    <p class="quiz-fb ok" hidden>Right — the derive macro turns your doc comments and <code>#[command]</code>/<code>#[arg]</code> attributes into the help screen (and <code>--version</code>, and the usage errors). You wrote none of that output code.</p>
+    <p class="quiz-fb ok" hidden>Right. The derive macro turns your doc comments and <code>#[command]</code>/<code>#[arg]</code> attributes into the help screen (and <code>--version</code>, and the usage errors). You wrote none of that output code.</p>
     <p class="quiz-fb no" hidden>You don't write any help-printing code. clap's derive macro builds <code>--help</code> from the struct's doc comments and <code>#[command]</code>/<code>#[arg]</code> attributes at compile time.</p>
   </div>
 
@@ -379,7 +379,7 @@ cargo run -- demo.txt combining.txt</code></pre>
   <p>The official walkthrough is the <a href="https://docs.rs/clap/latest/clap/_derive/_tutorial/index.html"><strong>clap Derive Tutorial</strong></a>, and the attribute reference is the <a href="https://docs.rs/clap/latest/clap/_derive/index.html"><strong>Derive Reference</strong></a> (every <code>#[command]</code> and <code>#[arg]</code> option). For features and the table-vs-string dependency form, see <a href="https://doc.rust-lang.org/cargo/reference/features.html"><strong>The Cargo Book — "Features."</strong></a> Inspecting the dependency graph is covered by <a href="https://doc.rust-lang.org/cargo/commands/cargo-tree.html"><strong><code>cargo tree</code></strong></a>.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> If clap rejects an argument you expected it to accept, paste the whole error — it prints the exact usage it expected. Next: <strong>Lesson 12 — ergonomic errors with <code>anyhow</code> &amp; <code>thiserror</code></strong>, giving each failure per-file context (<em>which</em> file failed and why) across the multi-file tool.
+    <strong>Questions are welcome.</strong> If clap rejects an argument you expected it to accept, paste the whole error: it prints the exact usage it expected. Next: <strong>Lesson 12 — ergonomic errors with <code>anyhow</code> &amp; <code>thiserror</code></strong>, which gives each failure per-file context (<em>which</em> file failed and why) across the multi-file tool.
   </div>
 
   <div class="lesson-foot">

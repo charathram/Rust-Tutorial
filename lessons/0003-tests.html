@@ -9,7 +9,7 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Lesson 3 · Build-along</p>
   <h1>Tests &amp; the feedback loop</h1>
-  <p class="subtitle">Make <code>rwc</code>'s counting testable, then write a test suite that <code>cargo test</code> runs — so the next refactor can't silently break it.</p>
+  <p class="subtitle">Make <code>rwc</code>'s counting testable, then write a test suite that <code>cargo test</code> runs, so the next refactor can't silently break it.</p>
 
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
@@ -26,8 +26,8 @@
   </div>
 
   <h2>Why now, and why a pure function first</h2>
-  <p>Right now every piece of <code>rwc</code> lives inside <code>main</code>: it reads an argument, reads a file, counts, and prints. That is hard to test, because to check the counting you would have to run the whole program against a real file and inspect its printed output. The fix is to separate the part you want to verify — the counting logic — from the parts that touch the outside world (arguments, files, the screen).</p>
-  <p>A <strong>pure function</strong> — one that just maps inputs to outputs with no I/O — is the easiest thing in any language to test: you hand it a value and assert on what it returns. So before writing a single test, we extract the counting into its own function.</p>
+  <p>Right now every piece of <code>rwc</code> lives inside <code>main</code>: it reads an argument, reads a file, counts, and prints. That is hard to test, because to check the counting you would have to run the whole program against a real file and inspect its printed output. The fix is to separate the part you want to verify (the counting logic) from the parts that touch the outside world (arguments, files, the screen).</p>
+  <p>A <strong>pure function</strong>, one that just maps inputs to outputs with no I/O, is the easiest thing in any language to test: you hand it a value and assert on what it returns. So before writing a single test, we extract the counting into its own function.</p>
 
   <h2>Step 1 — Extract a testable <code>counts</code> function</h2>
   <p>Pull the three counting lines out of <code>main</code> into a function that takes the text and returns the three totals, then call it from <code>main</code>:</p>
@@ -51,9 +51,9 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 }</code></pre>
   <p>What changed, and why each piece looks the way it does:</p>
   <ul>
-    <li><strong><code>fn counts(text: &amp;str) -&gt; (usize, usize, usize)</code></strong> — A new function. It takes <code>text</code> as a <code>&amp;str</code> — a <em>borrowed</em> view of the string (the counting only needs to read the text, not own it), which is the same borrowing idea you met as <code>&amp;path</code> in Lesson 1. It returns a <strong>tuple</strong> of three <code>usize</code> values: a tuple is a fixed-size group of values, written in parentheses, and <code>usize</code> is the unsigned integer type Rust uses for counts and sizes. In short: pass in text, get back its line, word, and character counts.</li>
-    <li><strong>The three <code>let</code> lines and <code>(lines, words, chars)</code></strong> — These moved verbatim out of <code>main</code>. The final line is the function's return value: Rust returns the value of the last expression in a function when it has no trailing semicolon, so this bare tuple <em>is</em> what <code>counts</code> hands back. No <code>return</code> keyword is needed.</li>
-    <li><strong><code>let (lines, words, chars) = counts(&amp;text);</code></strong> — Back in <code>main</code>, this calls the function and <em>destructures</em> the returned tuple into three named variables in one step, so the <code>println!</code> below it works exactly as before. We pass <code>&amp;text</code> — a borrow — so <code>main</code> keeps ownership of the file contents.</li>
+    <li><strong><code>fn counts(text: &amp;str) -&gt; (usize, usize, usize)</code></strong>: a new function. It takes <code>text</code> as a <code>&amp;str</code>, a <em>borrowed</em> view of the string (the counting only needs to read the text, not own it), which is the same borrowing idea you met as <code>&amp;path</code> in Lesson 1. It returns a <strong>tuple</strong> of three <code>usize</code> values: a tuple is a fixed-size group of values, written in parentheses, and <code>usize</code> is the unsigned integer type Rust uses for counts and sizes. In short: pass in text, get back its line, word, and character counts.</li>
+    <li><strong>The three <code>let</code> lines and <code>(lines, words, chars)</code></strong>: these moved verbatim out of <code>main</code>. The final line is the function's return value: Rust returns the value of the last expression in a function when it has no trailing semicolon, so this bare tuple <em>is</em> what <code>counts</code> hands back. No <code>return</code> keyword is needed.</li>
+    <li><strong><code>let (lines, words, chars) = counts(&amp;text);</code></strong>: back in <code>main</code>, this calls the function and <em>destructures</em> the returned tuple into three named variables in one step, so the <code>println!</code> below it works exactly as before. We pass <code>&amp;text</code>, a borrow, so <code>main</code> keeps ownership of the file contents.</li>
   </ul>
   <p>Confirm it still behaves identically before adding any tests:</p>
   <pre class="shell"><code>cargo run -- ../MISSION.md   <span class="c"># same counts as Lesson 2</span></code></pre>
@@ -92,12 +92,12 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 <span class="add">}</span></code></pre>
   <p>What each annotation and macro does:</p>
   <ul>
-    <li><strong><code>#[cfg(test)]</code></strong> — An <em>attribute</em> (the <code>#[…]</code> syntax) that conditionally compiles the module: the code inside is built <em>only</em> when you run <code>cargo test</code>, and is left out of your normal release binary entirely. So tests cost you nothing in the shipped program. (Rust Book, <a href="https://doc.rust-lang.org/book/ch11-01-writing-tests.html">Ch. 11.1</a>.)</li>
-    <li><strong><code>mod tests { … }</code></strong> — Declares a module named <code>tests</code> to hold the test functions. The name is conventional, not required.</li>
-    <li><strong><code>use super::*;</code></strong> — <code>super</code> means the parent module (here, the file's top level), and <code>*</code> brings everything from it into scope. This is what lets the tests call <code>counts</code> without qualifying it — the test module is nested, so it can't see <code>counts</code> until you import it.</li>
-    <li><strong><code>#[test]</code></strong> — Marks a function as a test. <code>cargo test</code> builds a special test runner that finds every <code>#[test]</code> function, runs it, and reports whether it passed (returned normally) or failed (panicked).</li>
-    <li><strong><code>assert_eq!(left, right)</code></strong> — Passes if the two values are equal; if not, it panics and prints <em>both</em> values, so a failure tells you exactly what you got versus what you expected. (<code>assert!(cond, "msg…")</code> checks a boolean and lets you add a custom failure message, as in the Unicode test.)</li>
-    <li><strong>The three tests</strong> — verify ordinary ASCII counts; that counting is Unicode-aware (the Tamil string is one word but has fewer characters than bytes — the <code>.chars()</code> vs <code>.len()</code> point from Lesson 1, now pinned down by a test); and the empty-input edge case.</li>
+    <li><strong><code>#[cfg(test)]</code></strong>: an <em>attribute</em> (the <code>#[…]</code> syntax) that conditionally compiles the module: the code inside is built <em>only</em> when you run <code>cargo test</code>, and is left out of your normal release binary entirely. So tests cost you nothing in the shipped program. (Rust Book, <a href="https://doc.rust-lang.org/book/ch11-01-writing-tests.html">Ch. 11.1</a>.)</li>
+    <li><strong><code>mod tests { … }</code></strong>: declares a module named <code>tests</code> to hold the test functions. The name is conventional, not required.</li>
+    <li><strong><code>use super::*;</code></strong>: <code>super</code> means the parent module (here, the file's top level), and <code>*</code> brings everything from it into scope. This is what lets the tests call <code>counts</code> without qualifying it: the test module is nested, so it can't see <code>counts</code> until you import it.</li>
+    <li><strong><code>#[test]</code></strong>: marks a function as a test. <code>cargo test</code> builds a special test runner that finds every <code>#[test]</code> function, runs it, and reports whether it passed (returned normally) or failed (panicked).</li>
+    <li><strong><code>assert_eq!(left, right)</code></strong>: passes if the two values are equal; if not, it panics and prints <em>both</em> values, so a failure tells you exactly what you got versus what you expected. (<code>assert!(cond, "msg…")</code> checks a boolean and lets you add a custom failure message, as in the Unicode test.)</li>
+    <li><strong>The three tests</strong> cover ordinary ASCII counts; Unicode-aware counting (the Tamil string is one word but has fewer characters than bytes, the <code>.chars()</code> vs <code>.len()</code> point from Lesson 1, now pinned down by a test); and the empty-input edge case.</li>
   </ul>
 
   <h2>Step 3 — Run the suite</h2>
@@ -109,17 +109,17 @@ test tests::counts_ascii ... ok
 test tests::counts_are_unicode_aware ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; ...</code></pre>
-  <p>Now make a test fail on purpose — change <code>assert_eq!(w, 4)</code> to <code>assert_eq!(w, 5)</code> and re-run. Read how <code>cargo test</code> reports the mismatch (it prints <code>left</code> and <code>right</code>), then change it back. That failure report is the feedback loop you will use for every change from here on.</p>
+  <p>Now make a test fail on purpose: change <code>assert_eq!(w, 4)</code> to <code>assert_eq!(w, 5)</code> and re-run. Read how <code>cargo test</code> reports the mismatch (it prints <code>left</code> and <code>right</code>), then change it back. That failure report is the feedback loop you will use for every change from here on.</p>
 
   <div class="win">
     <span class="label">Outcome</span>
-    <code>rwc</code> now has a pure <code>counts</code> function covered by a runnable test suite. <code>cargo test</code> gives you an instant, automatic check — so when Module 2 refactors the program's structure, any change that breaks the counting will fail a test immediately instead of slipping through.
+    <code>rwc</code> now has a pure <code>counts</code> function covered by a runnable test suite. <code>cargo test</code> gives you an instant, automatic check. When Module 2 refactors the program's structure, any change that breaks the counting will fail a test immediately instead of slipping through.
   </div>
 
   <h2>Optional extensions</h2>
   <ol>
     <li><strong>Add a case.</strong> Write a test for text with no trailing newline (e.g. <code>"one two"</code>) and confirm the line count is what you expect.</li>
-    <li><strong>Test the binary end to end.</strong> Rust's <code>tests/</code> directory holds <em>integration</em> tests. Testing a command-line binary's full behaviour (arguments, exit codes, stdout) is usually done by running the compiled program as a subprocess — the <code>assert_cmd</code> crate is the standard tool. That needs a dependency, which is Module 3 territory; note it as a goal.</li>
+    <li><strong>Test the binary end to end.</strong> Rust's <code>tests/</code> directory holds <em>integration</em> tests. Testing a command-line binary's full behaviour (arguments, exit codes, stdout) is usually done by running the compiled program as a subprocess; the <code>assert_cmd</code> crate is the standard tool. That needs a dependency, which is Module 3 territory; note it as a goal.</li>
     <li><strong>Document example.</strong> Add a <code>///</code> doc comment with a code example above <code>counts</code>; <code>cargo test</code> runs those examples as "doc-tests" too.</li>
   </ol>
 
@@ -129,8 +129,8 @@ test result: ok. 3 passed; 0 failed; 0 ignored; ...</code></pre>
     <button class="quiz-opt" data-correct>Compiles that code only for tests</button>
     <button class="quiz-opt">Marks a single function as a test</button>
     <button class="quiz-opt">Runs the tests in parallel threads</button>
-    <p class="quiz-fb ok" hidden>Right — the module is built only under `cargo test`, so tests add nothing to the normal release binary. (#[test] is what marks each function.)</p>
-    <p class="quiz-fb no" hidden>That's #[test]'s job. #[cfg(test)] conditionally compiles the whole module — only when running tests, never in the release binary.</p>
+    <p class="quiz-fb ok" hidden>Right. The module is built only under `cargo test`, so tests add nothing to the normal release binary. (#[test] is what marks each function.)</p>
+    <p class="quiz-fb no" hidden>That's #[test]'s job. #[cfg(test)] conditionally compiles the whole module, so it is built when running tests and left out of the release binary.</p>
   </div>
 
   <div class="quiz">
@@ -138,7 +138,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; ...</code></pre>
     <button class="quiz-opt" data-correct>A pure function tests without any I/O</button>
     <button class="quiz-opt">Functions always run faster than code</button>
     <button class="quiz-opt">main cannot contain a loop counter</button>
-    <p class="quiz-fb ok" hidden>Yes — isolating the logic from file/argument/print I/O lets a test pass input and assert on output directly, with no files involved.</p>
+    <p class="quiz-fb ok" hidden>Yes. Isolating the logic from file/argument/print I/O lets a test pass input and assert on output directly, with no files involved.</p>
     <p class="quiz-fb no" hidden>It's about testability, not speed: a pure function (no I/O) can be checked by passing input and asserting the return value, unlike logic buried in main.</p>
   </div>
 
@@ -147,7 +147,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; ...</code></pre>
     <button class="quiz-opt" data-correct>When the two values are not equal</button>
     <button class="quiz-opt">When either value is set to zero</button>
     <button class="quiz-opt">When the function returns a tuple</button>
-    <p class="quiz-fb ok" hidden>Correct — unequal values make assert_eq! panic and print both sides; a panic in a #[test] function is reported as a failure.</p>
+    <p class="quiz-fb ok" hidden>Correct. Unequal values make assert_eq! panic and print both sides; a panic in a #[test] function is reported as a failure.</p>
     <p class="quiz-fb no" hidden>assert_eq! fails specifically when left != right (it then panics and prints both values). Zeroes and tuples are fine if they match.</p>
   </div>
 
@@ -155,7 +155,7 @@ test result: ok. 3 passed; 0 failed; 0 ignored; ...</code></pre>
   <p>The canonical guide, with the same macros and module pattern used here: <a href="https://doc.rust-lang.org/book/ch11-01-writing-tests.html"><strong>The Rust Book, Ch. 11.1 — "How to Write Tests."</strong></a> Chapter 11.3 ("Test Organization") covers the unit-vs-integration split and the <code>tests/</code> directory referenced in the extensions.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> Paste your <code>cargo test</code> output — especially a failing run, which is worth reading together. This completes Module 1 (a correct, tested CLI). Next is Module 2: with tests in place as a safety net, we refactor <code>rwc</code> into a multi-file, stdin-aware tool and meet borrowing, structs, enums, and lifetimes as that work demands them.
+    <strong>Questions are welcome.</strong> Paste your <code>cargo test</code> output, especially a failing run, which is worth reading together. This completes Module 1 (a correct, tested CLI). Next is Module 2: with tests in place as a safety net, we refactor <code>rwc</code> into a multi-file, stdin-aware tool and meet borrowing, structs, enums, and lifetimes as that work demands them.
   </div>
 
   <div class="lesson-foot">

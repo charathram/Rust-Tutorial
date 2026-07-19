@@ -14,30 +14,30 @@
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
   <ul>
-    <li>Read a <code>rustc</code> error <em>structurally</em> — find the error code, the primary span, the secondary labels, and the <code>help</code> in any message.</li>
-    <li>Recognise the four most common borrow errors on sight — <code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code> — and apply each one's standard fix.</li>
+    <li>Read a <code>rustc</code> error <em>structurally</em>: find the error code, the primary span, the secondary labels, and the <code>help</code> in any message.</li>
+    <li>Recognise the four most common borrow errors on sight (<code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code>) and apply each one's standard fix.</li>
     <li>Explain <em>why</em> each error is the compiler enforcing a Lesson 4 rule, not being pedantic.</li>
     <li>Use <code>rustc --explain</code> and the online error index to decode any error you haven't seen before.</li>
   </ul>
 
   <div class="note">
     <span class="label">Starting point</span>
-    Work in <code>0005-rwc/</code>, a clean copy of the finished, tested tool from <a href="./0004-borrowing.html">Lesson 4</a> (multi-file counting with a grand total). Confirm it is green before you start — <code>cargo test</code> should report <code>4 passed</code>. Each step below has you <em>break</em> the code on purpose, read the resulting error, then put it back. Nothing here changes <code>rwc</code> permanently; you are practising reading errors, not adding a feature.
+    Work in <code>0005-rwc/</code>, a clean copy of the finished, tested tool from <a href="./0004-borrowing.html">Lesson 4</a> (multi-file counting with a grand total). Confirm it is green before you start: <code>cargo test</code> should report <code>4 passed</code>. Each step below has you <em>break</em> the code on purpose, read the resulting error, then put it back. Nothing here changes <code>rwc</code> permanently; you are practising reading errors, not adding a feature.
   </div>
 
   <h2>Why a lesson on errors</h2>
-  <p>In C, a type error is often a terse one-liner and a data race produces no error at all — just a crash later in production. Rust does the opposite: it refuses to compile a whole category of bugs, and it spends real effort <em>explaining</em> each refusal. A borrow-checker error tells you, with line numbers and arrows, exactly which Lesson 4 rule the code violates and usually how to fix it. This lesson teaches you to read that explanation quickly instead of guessing, so the borrow checker catches your mistakes before they ship rather than slowing you down.</p>
+  <p>In C, a type error is often a terse one-liner and a data race produces no error at all, just a crash later in production. Rust does the opposite: it refuses to compile a whole category of bugs, and it spends real effort <em>explaining</em> each refusal. A borrow-checker error tells you, with line numbers and arrows, exactly which Lesson 4 rule the code violates and usually how to fix it. This lesson teaches you to read that explanation quickly instead of guessing, so the borrow checker catches your mistakes before they ship rather than slowing you down.</p>
   <p>Every error below is one you will hit for real while writing Rust. We provoke them in <code>rwc</code> on purpose so you meet them in code you already understand.</p>
 
   <div class="compare">
     <span class="label">How to read any rustc error</span>
     <p>Every <code>rustc</code> diagnostic has the same structure. Learn the parts once and you can skim any future error:</p>
     <ul>
-      <li><strong><code>error[E0382]: borrow of moved value</code></strong> — the <em>error code</em> (clickable concept you can look up) and a one-line summary. The code is the most searchable thing in the whole message.</li>
-      <li><strong><code>--&gt; src/main.rs:37:8</code></strong> — the <em>location</em>: file, line, column of the primary problem.</li>
-      <li><strong>The <code>^^^^^</code> caret line</strong> — the <em>primary span</em>: the exact code the compiler is complaining about, underlined with carets.</li>
-      <li><strong>The <code>-----</code> underlines with text</strong> — <em>secondary labels</em>: other spots that explain the primary one (where a value was moved, where a borrow started, where it is "later used"). For borrow errors these are the whole story — they show you the two events that conflict.</li>
-      <li><strong><code>help:</code> and <code>note:</code></strong> — a suggested fix (often the literal edit to make) and extra context. The <code>help</code> is right far more often than not.</li>
+      <li><strong><code>error[E0382]: borrow of moved value</code></strong> gives the <em>error code</em> (a concept you can look up) and a one-line summary. The code is the most searchable thing in the whole message.</li>
+      <li><strong><code>--&gt; src/main.rs:37:8</code></strong> marks the <em>location</em>: file, line, column of the primary problem.</li>
+      <li><strong>The <code>^^^^^</code> caret line</strong> is the <em>primary span</em>: the exact code the compiler is complaining about, underlined with carets.</li>
+      <li><strong>The <code>-----</code> underlines with text</strong> are the <em>secondary labels</em>: other spots that explain the primary one (where a value was moved, where a borrow started, where it is "later used"). For borrow errors these are the whole story: they show you the two events that conflict.</li>
+      <li><strong><code>help:</code> and <code>note:</code></strong> give a suggested fix (often the literal edit to make) and extra context. The <code>help</code> is right far more often than not.</li>
     </ul>
     <p>Reading order that works: <em>code → summary → the two labelled spans → help.</em> Borrow errors are almost always a conflict between <strong>two</strong> points in the code, and the labels name both.</p>
   </div>
@@ -61,18 +61,18 @@ help: consider changing this to be mutable
 For more information about this error, try `rustc --explain E0596`.</code></pre>
   <p>Decoding it, part by part:</p>
   <ul>
-    <li><strong>The primary span (line 35)</strong> points at <code>&amp;mut total</code> — the place you asked for a <em>mutable</em> borrow. That is the action the compiler can't allow.</li>
+    <li><strong>The primary span (line 35)</strong> points at <code>&amp;mut total</code>, the place you asked for a <em>mutable</em> borrow. That is the action the compiler can't allow.</li>
     <li><strong>The reason</strong> is in the summary: <code>total</code> "is not declared as mutable." In Rust every binding is immutable by default (the opposite of C and Go), and you can only hand out a <code>&amp;mut</code> to something declared <code>mut</code>. The mismatch is between the <em>request</em> on line 35 and the <em>declaration</em> on line 29.</li>
-    <li><strong>The <code>help</code></strong> shows the exact fix — adding <code>mut</code> at line 29 — even drawing the <code>+++</code> where the three new characters go.</li>
+    <li><strong>The <code>help</code></strong> shows the exact fix, adding <code>mut</code> at line 29, and even draws the <code>+++</code> where the three new characters go.</li>
   </ul>
-  <p><strong>Fix:</strong> put the <code>mut</code> back. This is the compiler enforcing that mutation is never silent — a reader (and the compiler) can tell a binding is mutable just by looking at its declaration.</p>
+  <p><strong>Fix:</strong> put the <code>mut</code> back. This is the compiler enforcing that mutation is never silent: a reader (and the compiler) can tell a binding is mutable just by looking at its declaration.</p>
 
   <h2>Step 2 — <code>E0382</code>: using a value after it moved</h2>
   <p>This is the central ownership error, and the reason Lesson 4 used <code>for path in &amp;paths</code> instead of <code>for path in paths</code>. Remove that <code>&amp;</code> so the loop consumes the vector:</p>
   <pre><code>    let mut total = (0, 0, 0);
 <span class="add">    for path in paths {</span>
         let text = fs::read_to_string(&amp;path)</code></pre>
-  <p>(You also need <code>&amp;path</code> on the next line now, because <code>path</code> is an owned <code>String</code> rather than a reference — but that is not what breaks.) Build it:</p>
+  <p>(You also need <code>&amp;path</code> on the next line now, because <code>path</code> is an owned <code>String</code> rather than a reference, but that is not what breaks.) Build it:</p>
   <pre class="shell"><code>error[E0382]: borrow of moved value: `paths`
    --&gt; src/main.rs:37:8
     |
@@ -94,14 +94,14 @@ help: consider iterating over a slice of the `Vec&lt;String&gt;`'s content to av
 For more information about this error, try `rustc --explain E0382`.</code></pre>
   <p>This message has <em>three</em> labelled spans, and reading all three is the whole skill. In order:</p>
   <ul>
-    <li><strong>Line 23 — "move occurs because <code>paths</code> has type <code>Vec&lt;String&gt;</code>, which does not implement the <code>Copy</code> trait."</strong> This is the root cause. A <code>Vec</code> owns heap memory, so it is a <em>move</em> type, not a <code>Copy</code> type — handing it somewhere transfers ownership rather than duplicating it. (The rule from Lesson 4: own a resource ⇒ move; trivially copyable ⇒ <code>Copy</code>.)</li>
-    <li><strong>Line 30 — "<code>paths</code> moved due to this implicit call to <code>.into_iter()</code>."</strong> This is the subtle part the message points out: <code>for x in collection</code> desugars to <code>collection.into_iter()</code>, and <code>into_iter</code> <em>takes ownership</em> (the <code>note</code> spells this out). So the loop didn't borrow <code>paths</code> — it consumed it. After the loop, <code>paths</code> no longer exists.</li>
-    <li><strong>Line 37 — "value borrowed here after move."</strong> This is the primary span: the place that fails. Calling <code>paths.len()</code> needs <code>paths</code> to still be alive, but line 30 already moved it away. The conflict is between line 30 (move) and line 37 (use).</li>
+    <li><strong>Line 23: "move occurs because <code>paths</code> has type <code>Vec&lt;String&gt;</code>, which does not implement the <code>Copy</code> trait."</strong> This is the root cause. A <code>Vec</code> owns heap memory, so it is a <em>move</em> type, not a <code>Copy</code> type: handing it somewhere transfers ownership rather than duplicating it. (The rule from Lesson 4: own a resource ⇒ move; trivially copyable ⇒ <code>Copy</code>.)</li>
+    <li><strong>Line 30: "<code>paths</code> moved due to this implicit call to <code>.into_iter()</code>."</strong> This is the subtle part the message points out: <code>for x in collection</code> desugars to <code>collection.into_iter()</code>, and <code>into_iter</code> <em>takes ownership</em> (the <code>note</code> spells this out). So the loop didn't borrow <code>paths</code>; it consumed it. After the loop, <code>paths</code> no longer exists.</li>
+    <li><strong>Line 37: "value borrowed here after move."</strong> This is the primary span: the place that fails. Calling <code>paths.len()</code> needs <code>paths</code> to still be alive, but line 30 already moved it away. The conflict is between line 30 (move) and line 37 (use).</li>
   </ul>
-  <p><strong>Fix:</strong> do what the <code>help</code> says — iterate over <code>&amp;paths</code>, which calls <code>.iter()</code> and only <em>borrows</em> the vector, leaving it intact for <code>paths.len()</code> afterwards. That is why Lesson 4 wrote the loop that way. Put the <code>&amp;</code> back (and restore <code>read_to_string(path)</code>).</p>
+  <p><strong>Fix:</strong> do what the <code>help</code> says: iterate over <code>&amp;paths</code>, which calls <code>.iter()</code> and only <em>borrows</em> the vector, leaving it intact for <code>paths.len()</code> afterwards. That is why Lesson 4 wrote the loop that way. Put the <code>&amp;</code> back (and restore <code>read_to_string(path)</code>).</p>
 
   <h2>Step 3 — <code>E0502</code>: a shared and a mutable borrow at the same time</h2>
-  <p>Now provoke the main rule from Lesson 4 — <em>shared XOR mutable</em>. Inside the loop, take a plain (shared) borrow of <code>total</code>, then mutate it through <code>add_into</code>, then use the shared borrow afterwards:</p>
+  <p>Now provoke the main rule from Lesson 4: <em>shared XOR mutable</em>. Inside the loop, take a plain (shared) borrow of <code>total</code>, then mutate it through <code>add_into</code>, then use the shared borrow afterwards:</p>
   <pre><code>        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
 <span class="add">        let peek = &amp;total;</span>
         add_into(&amp;mut total, (lines, words, chars));
@@ -119,15 +119,15 @@ For more information about this error, try `rustc --explain E0382`.</code></pre>
 For more information about this error, try `rustc --explain E0502`.</code></pre>
   <p>The three labels are the rule, made concrete:</p>
   <ul>
-    <li><strong>Line 35 — "immutable borrow occurs here."</strong> <code>peek = &amp;total</code> is a shared <code>&amp;</code> borrow.</li>
-    <li><strong>Line 36 — "mutable borrow occurs here."</strong> <code>&amp;mut total</code> is an exclusive borrow — and exclusive means <em>nothing else may be borrowing <code>total</code> right now</em>.</li>
-    <li><strong>Line 37 — "immutable borrow later used here."</strong> This is the key one. The shared borrow from line 35 is still alive on line 37 (you use <code>peek</code> there), so it overlaps the mutable borrow on line 36. Two borrows, one shared and one mutable, alive at the same instant: forbidden.</li>
+    <li><strong>Line 35: "immutable borrow occurs here."</strong> <code>peek = &amp;total</code> is a shared <code>&amp;</code> borrow.</li>
+    <li><strong>Line 36: "mutable borrow occurs here."</strong> <code>&amp;mut total</code> is an exclusive borrow, and exclusive means <em>nothing else may be borrowing <code>total</code> right now</em>.</li>
+    <li><strong>Line 37: "immutable borrow later used here."</strong> This is the key one. The shared borrow from line 35 is still alive on line 37 (you use <code>peek</code> there), so it overlaps the mutable borrow on line 36. Two borrows, one shared and one mutable, alive at the same instant: forbidden.</li>
   </ul>
-  <p>Notice <em>why</em> the third label matters so much: if you deleted line 37, the shared borrow would end right after line 35 (its last use), the overlap would vanish, and the code would compile. The compiler tracks a borrow's life from where it starts to its <strong>last use</strong>, not to the end of the block — this is "non-lexical lifetimes," and it is why reordering or removing a later use often fixes a borrow error.</p>
-  <p><strong>Fix:</strong> remove the <code>peek</code> lines. If you genuinely needed to read the running subtotal, you would read it <em>before</em> the mutation or <em>after</em> it (a fresh borrow each time), never holding one across the other.</p>
+  <p>Notice <em>why</em> the third label matters so much: if you deleted line 37, the shared borrow would end right after line 35 (its last use), the overlap would vanish, and the code would compile. The compiler tracks a borrow's life from where it starts to its <strong>last use</strong>, not to the end of the block. This is "non-lexical lifetimes," and it is why reordering or removing a later use often fixes a borrow error.</p>
+  <p><strong>Fix:</strong> remove the <code>peek</code> lines. If you genuinely needed to read the running subtotal, you would read it <em>before</em> the mutation or <em>after</em> it (a fresh borrow each time), rather than holding one across the other.</p>
 
   <h2>Step 4 — <code>E0499</code>: two mutable borrows at once</h2>
-  <p>The mutable-side of the same rule: <code>&amp;mut</code> is exclusive even against <em>another</em> <code>&amp;mut</code>. Force two live mutable borrows of <code>total</code>:</p>
+  <p>The mutable side of the same rule: <code>&amp;mut</code> is exclusive even against <em>another</em> <code>&amp;mut</code>. Force two live mutable borrows of <code>total</code>:</p>
   <pre><code>        println!("{lines:&gt;6} {words:&gt;6} {chars:&gt;6} {path}");
 <span class="add">        let a = &amp;mut total;</span>
 <span class="add">        let b = &amp;mut total;</span>
@@ -146,14 +146,14 @@ For more information about this error, try `rustc --explain E0502`.</code></pre>
 
 For more information about this error, try `rustc --explain E0499`.</code></pre>
   <ul>
-    <li><strong>Line 35</strong> creates the first <code>&amp;mut</code> (<code>a</code>); <strong>line 36</strong> creates a second (<code>b</code>) — the primary span, because the second is the one that can't exist.</li>
-    <li><strong>Line 38 — "first borrow later used here."</strong> Same non-lexical-lifetime logic: because <code>a</code> is used on line 38, its borrow is still alive when <code>b</code> is created on line 36. Two exclusive borrows, overlapping. Had you finished using <code>a</code> before creating <code>b</code>, there would be no overlap and no error.</li>
+    <li><strong>Line 35</strong> creates the first <code>&amp;mut</code> (<code>a</code>); <strong>line 36</strong> creates a second (<code>b</code>), the primary span, because the second is the one that can't exist.</li>
+    <li><strong>Line 38: "first borrow later used here."</strong> Same non-lexical-lifetime logic: because <code>a</code> is used on line 38, its borrow is still alive when <code>b</code> is created on line 36. Two exclusive borrows, overlapping. Had you finished using <code>a</code> before creating <code>b</code>, there would be no overlap and no error.</li>
   </ul>
-  <p><strong>Fix:</strong> remove the <code>a</code>/<code>b</code> lines and keep the original single <code>add_into(&amp;mut total, …)</code>. One exclusive borrow, used and released, then the next — which is exactly what the loop already did.</p>
+  <p><strong>Fix:</strong> remove the <code>a</code>/<code>b</code> lines and keep the original single <code>add_into(&amp;mut total, …)</code>. One exclusive borrow, used and released, then the next, which is exactly what the loop already did.</p>
 
   <div class="note">
     <span class="label">Tool · <code>rustc --explain</code></span>
-    <p>Every error message ends with <code>try `rustc --explain E0XXX`</code>. Run it for a full prose write-up of the error with a minimal example and the reasoning behind it — it works offline and is often clearer than searching the web:</p>
+    <p>Every error message ends with <code>try `rustc --explain E0XXX`</code>. Run it for a full prose write-up of the error with a minimal example and the reasoning behind it. It works offline and is often clearer than searching the web:</p>
     <pre class="shell"><code>rustc --explain E0502</code></pre>
     <p>The same content lives online in the <strong>Rust Error Index</strong> (linked at the foot of this page). When you hit an <code>E03xx</code> you don't recognise, that is the fastest authoritative source.</p>
   </div>
@@ -162,10 +162,10 @@ For more information about this error, try `rustc --explain E0499`.</code></pre>
     <span class="label">The four, at a glance</span>
     <p>Almost every borrow error you meet early on is one of these. The pattern to internalise: <em>find the two conflicting spans, identify which rule they break, apply the fix.</em></p>
     <ul>
-      <li><strong><code>E0596</code> — cannot borrow as mutable, not declared mutable.</strong> You took <code>&amp;mut</code> of an immutable binding. <em>Fix:</em> add <code>mut</code> to the <code>let</code>.</li>
-      <li><strong><code>E0382</code> — use of moved value.</strong> You used a value after it was moved (often by passing it by value or by <code>for x in collection</code>). <em>Fix:</em> borrow instead of move (<code>&amp;</code>), or <code>.clone()</code> if you truly need a second owner.</li>
-      <li><strong><code>E0502</code> — mutable borrow while an immutable borrow is live.</strong> Shared and mutable overlapped. <em>Fix:</em> end the shared borrow before mutating (don't use it across the mutation).</li>
-      <li><strong><code>E0499</code> — two mutable borrows at once.</strong> Two exclusive borrows overlapped. <em>Fix:</em> finish with the first before taking the second.</li>
+      <li><strong><code>E0596</code>: cannot borrow as mutable, not declared mutable.</strong> You took <code>&amp;mut</code> of an immutable binding. <em>Fix:</em> add <code>mut</code> to the <code>let</code>.</li>
+      <li><strong><code>E0382</code>: use of moved value.</strong> You used a value after it was moved (often by passing it by value or by <code>for x in collection</code>). <em>Fix:</em> borrow instead of move (<code>&amp;</code>), or <code>.clone()</code> if you truly need a second owner.</li>
+      <li><strong><code>E0502</code>: mutable borrow while an immutable borrow is live.</strong> Shared and mutable overlapped. <em>Fix:</em> end the shared borrow before mutating (don't use it across the mutation).</li>
+      <li><strong><code>E0499</code>: two mutable borrows at once.</strong> Two exclusive borrows overlapped. <em>Fix:</em> finish with the first before taking the second.</li>
     </ul>
     <p>The common thread under all four: a borrow lives until its <strong>last use</strong>, and the rule is <em>shared XOR mutable</em>. Most fixes are just shrinking a borrow's life so two of them stop overlapping.</p>
   </div>
@@ -174,17 +174,17 @@ For more information about this error, try `rustc --explain E0499`.</code></pre>
   <p>After undoing all four experiments, <code>rwc</code> should be byte-for-byte the finished Lesson 4 tool. Verify nothing leaked:</p>
   <pre class="shell"><code>cargo test
 cargo run -- ../MISSION.md ../NOTES.md</code></pre>
-  <p>You should again see <code>4 passed</code> and a per-file-plus-total listing. The point of the lesson isn't a code change — it's that the next time the borrow checker stops you, you read the message instead of guessing at a fix.</p>
+  <p>You should again see <code>4 passed</code> and a per-file-plus-total listing. Nothing in the code changed. What changed is how you respond the next time the borrow checker stops you: read the message instead of guessing at a fix.</p>
 
   <div class="win">
     <span class="label">Outcome</span>
-    You can now read a borrow-checker error part by part: code, summary, the conflicting spans, help. You met the four you will hit most — <code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code> — saw each as one of Lesson 4's rules being enforced, and learned the model that fixes most of them: a borrow lasts until its last use, and shared excludes mutable. <code>rustc --explain</code> and the Error Index cover everything else.
+    You can now read a borrow-checker error part by part: code, summary, the conflicting spans, help. You met the four you will hit most (<code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code>), saw each as one of Lesson 4's rules being enforced, and learned the model that fixes most of them: a borrow lasts until its last use, and shared excludes mutable. <code>rustc --explain</code> and the Error Index cover everything else.
   </div>
 
   <h2>Optional extensions</h2>
   <ol>
-    <li><strong>Provoke <code>E0505</code> (move out of a borrowed value).</strong> Inside the loop add <code>let r = &amp;total;</code>, then on a later line write <code>let stolen = total;</code> and use <code>r</code> after it. Read how the message differs from <code>E0502</code> — here you are <em>moving</em> the value out while it is borrowed, not borrowing it again.</li>
-    <li><strong>Fix <code>E0382</code> the other way.</strong> In Step 2, instead of restoring the <code>&amp;</code>, leave <code>for path in paths</code> and replace the later <code>paths.len()</code> with a length captured <em>before</em> the loop (<code>let n = paths.len();</code>). Confirm it compiles, then decide which fix you prefer and why — borrowing vs. reading the length up front.</li>
+    <li><strong>Provoke <code>E0505</code> (move out of a borrowed value).</strong> Inside the loop add <code>let r = &amp;total;</code>, then on a later line write <code>let stolen = total;</code> and use <code>r</code> after it. Read how the message differs from <code>E0502</code>: here you are <em>moving</em> the value out while it is borrowed, not borrowing it again.</li>
+    <li><strong>Fix <code>E0382</code> the other way.</strong> In Step 2, instead of restoring the <code>&amp;</code>, leave <code>for path in paths</code> and replace the later <code>paths.len()</code> with a length captured <em>before</em> the loop (<code>let n = paths.len();</code>). Confirm it compiles, then decide which fix you prefer and why: borrowing vs. reading the length up front.</li>
     <li><strong>Run <code>rustc --explain</code> on all four.</strong> Compare its canonical minimal example for each error to the <code>rwc</code> version you just produced. Seeing the same error in two different shapes is what makes it recognisable next time.</li>
   </ol>
 
@@ -194,8 +194,8 @@ cargo run -- ../MISSION.md ../NOTES.md</code></pre>
     <button class="quiz-opt" data-correct>That the borrow is still alive at that point, so it overlaps the conflicting one</button>
     <button class="quiz-opt">That the borrow was created on that line</button>
     <button class="quiz-opt">That you should delete that line to fix the error</button>
-    <p class="quiz-fb ok" hidden>Right — a borrow lives until its last use. "Later used here" marks that last use, proving the borrow is still alive and therefore overlaps the other borrow. Shrinking that life (using it earlier, or not at all) is often the fix.</p>
-    <p class="quiz-fb no" hidden>It marks where the borrow is <em>last used</em>, which proves it is still alive at that point — and therefore overlaps the conflicting borrow. It is not where the borrow started, and deleting the line is only sometimes the right fix.</p>
+    <p class="quiz-fb ok" hidden>Right. A borrow lives until its last use. "Later used here" marks that last use, which proves the borrow is still alive and therefore overlaps the other borrow. Shrinking that life (using it earlier, or not at all) is often the fix.</p>
+    <p class="quiz-fb no" hidden>It marks where the borrow is <em>last used</em>, which proves it is still alive at that point, and therefore overlaps the conflicting borrow. It is not where the borrow started, and deleting the line is only sometimes the right fix.</p>
   </div>
 
   <div class="quiz">
@@ -203,7 +203,7 @@ cargo run -- ../MISSION.md ../NOTES.md</code></pre>
     <button class="quiz-opt" data-correct><code>for</code> calls <code>.into_iter()</code>, which moves <code>paths</code> into the loop and consumes it</button>
     <button class="quiz-opt">A <code>Vec</code> can only be iterated once per program</button>
     <button class="quiz-opt"><code>paths.len()</code> is not a valid method on a moved vector</button>
-    <p class="quiz-fb ok" hidden>Correct — <code>for x in collection</code> desugars to <code>collection.into_iter()</code>, which takes ownership. After the loop, <code>paths</code> has been moved away, so any later use is a use-after-move. Iterating <code>&amp;paths</code> borrows instead.</p>
+    <p class="quiz-fb ok" hidden>Correct. <code>for x in collection</code> desugars to <code>collection.into_iter()</code>, which takes ownership. After the loop, <code>paths</code> has been moved away, so any later use is a use-after-move. Iterating <code>&amp;paths</code> borrows instead.</p>
     <p class="quiz-fb no" hidden>It is about ownership: <code>for x in collection</code> desugars to <code>.into_iter()</code>, which <em>moves</em> the vector into the loop. The vector is fine to iterate many times by reference; the problem is that by-value iteration consumed it.</p>
   </div>
 
@@ -212,15 +212,15 @@ cargo run -- ../MISSION.md ../NOTES.md</code></pre>
     <button class="quiz-opt" data-correct>Declare the binding <code>let mut total = …</code></button>
     <button class="quiz-opt">Pass <code>total</code> by value instead of by <code>&amp;mut</code></button>
     <button class="quiz-opt">Add a second <code>&amp;mut</code> borrow to satisfy the checker</button>
-    <p class="quiz-fb ok" hidden>Right — you can only take a <code>&amp;mut</code> of a binding declared <code>mut</code>. The error even shows the exact edit (<code>+++</code> before <code>total</code> on the <code>let</code> line).</p>
+    <p class="quiz-fb ok" hidden>Right. You can only take a <code>&amp;mut</code> of a binding declared <code>mut</code>. The error even shows the exact edit (<code>+++</code> before <code>total</code> on the <code>let</code> line).</p>
     <p class="quiz-fb no" hidden>The request for <code>&amp;mut</code> is fine; the binding just isn't mutable. Add <code>mut</code> to its <code>let</code>. Passing by value would defeat the in-place accumulation, and a second borrow makes things worse, not better.</p>
   </div>
 
   <h2>Primary sources</h2>
-  <p>The canonical reference for every code in this lesson is the <a href="https://doc.rust-lang.org/error_codes/error-index.html"><strong>Rust Error Index</strong></a> — the same text <code>rustc --explain</code> prints. The rules being enforced are <a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"><strong>The Rust Book, Ch. 4.2 — "References and Borrowing"</strong></a> (shared XOR mutable), and the "last use" behaviour is <em>non-lexical lifetimes</em>, summarised in <a href="https://doc.rust-lang.org/edition-guide/rust-2018/ownership-and-lifetimes/non-lexical-lifetimes.html"><strong>the Edition Guide</strong></a>.</p>
+  <p>The canonical reference for every code in this lesson is the <a href="https://doc.rust-lang.org/error_codes/error-index.html"><strong>Rust Error Index</strong></a>, the same text <code>rustc --explain</code> prints. The rules being enforced are <a href="https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html"><strong>The Rust Book, Ch. 4.2 — "References and Borrowing"</strong></a> (shared XOR mutable), and the "last use" behaviour is <em>non-lexical lifetimes</em>, summarised in <a href="https://doc.rust-lang.org/edition-guide/rust-2018/ownership-and-lifetimes/non-lexical-lifetimes.html"><strong>the Edition Guide</strong></a>.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> Paste any borrow-checker error you hit — in <code>rwc</code> or elsewhere — and we will read it together. The next lesson stops breaking <code>rwc</code> and starts changing it: <strong>Lesson 6 introduces <code>struct</code>s and <code>enum</code>s</strong>, replacing the <code>(usize, usize, usize)</code> tuple with a named <code>Counts</code> struct and modelling <em>file vs stdin</em> input as a <code>Source</code> enum.
+    <strong>Questions are welcome.</strong> Paste any borrow-checker error you hit, in <code>rwc</code> or elsewhere, and we will read it together. The next lesson stops breaking <code>rwc</code> and starts changing it: <strong>Lesson 6 introduces <code>struct</code>s and <code>enum</code>s</strong>, replacing the <code>(usize, usize, usize)</code> tuple with a named <code>Counts</code> struct and modelling <em>file vs stdin</em> input as a <code>Source</code> enum.
   </div>
 
   <div class="lesson-foot">

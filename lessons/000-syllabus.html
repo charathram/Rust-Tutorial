@@ -70,24 +70,24 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Course overview</p>
   <h1>Syllabus</h1>
-  <p class="subtitle">A project-anchored path from the ownership model to shippable command-line tools and web backends — with explicit outcomes, prerequisites, checkpoints, and staged assessment.</p>
+  <p class="subtitle">A project-anchored path from the ownership model to shippable command-line tools and web backends, with explicit outcomes, prerequisites, checkpoints, and staged assessment.</p>
 
   <p class="lead">This course builds real, runnable programs. Each module declares what you will be able to <em>do</em>, states its prerequisites, and ends in a checkpoint deliverable with acceptance criteria. Two cumulative checkpoints interleave everything learned so far. The <a href="../reference/glossary.html">glossary</a> holds shared vocabulary; curated sources back every claim.</p>
 
   <h2>The mission</h2>
-  <p>Get to where you reach for Rust by default — building CLI utilities and web backends that are fast, correct, and memory-safe without a garbage collector. The course is assessed against three success criteria: ship a non-trivial CLI end to end; stand up a small web service; read and resolve ownership, borrowing, and error-handling code without guessing.</p>
+  <p>Get to where you reach for Rust by default: building CLI utilities and web backends that are fast, correct, and memory-safe without a garbage collector. The course is assessed against three success criteria: ship a non-trivial CLI end to end; stand up a small web service; read and resolve ownership, borrowing, and error-handling code without guessing.</p>
 
   <h2>How the course works</h2>
   <ul>
-    <li><strong>Project-anchored, with one exception.</strong> A single Module 0 primer front-loads the ownership model up front. <em>From the first numbered lesson onward, every concept is introduced by a concrete feature of the tool currently being built</em> — no theory taught in isolation.</li>
-    <li><strong>Outcomes, prerequisites &amp; checkpoints.</strong> Each module lists measurable outcomes, the modules it assumes, and a deliverable judged against stated acceptance criteria. Within a module, lessons are strictly sequential — so module prerequisites plus that ordering define the full dependency graph.</li>
-    <li><strong>Spaced &amp; genuinely interleaved.</strong> Modules carry a review step that recalls earlier material in new work, and two <span class="tag">Interleaved checkpoint</span> problem sets (after Modules 4 and 6) mix tasks drawn at random from <em>all</em> prior modules — the strict sense of interleaving, not just spaced repetition.</li>
+    <li><strong>Project-anchored, with one exception.</strong> A single Module 0 primer front-loads the ownership model up front. From the first numbered lesson onward, every concept is introduced by a concrete feature of the tool currently being built; no theory is taught in isolation.</li>
+    <li><strong>Outcomes, prerequisites &amp; checkpoints.</strong> Each module lists measurable outcomes, the modules it assumes, and a deliverable judged against stated acceptance criteria. Within a module, lessons are strictly sequential, so module prerequisites plus that ordering define the full dependency graph.</li>
+    <li><strong>Spaced &amp; genuinely interleaved.</strong> Modules carry a review step that recalls earlier material in new work, and two <span class="tag">Interleaved checkpoint</span> problem sets (after Modules 4 and 6) mix tasks drawn at random from <em>all</em> prior modules: the strict sense of interleaving, not just spaced repetition.</li>
     <li><strong>Practice in the wild.</strong> Each module names a community touchpoint (<a href="https://users.rust-lang.org/">users.rust-lang.org</a>, <a href="https://www.reddit.com/r/rust/">r/rust</a>) where you can post your work and get real critique.</li>
     <li><strong>Reproducibility.</strong> Projects pin a toolchain (<code>rust-toolchain.toml</code>, currently 1.96) and lock crate versions. The web-stack modules (axum, sqlx) track fast-moving crates and will be version-refreshed when reached.</li>
   </ul>
 
   <h2>Scope &amp; time commitment</h2>
-  <p><strong>36 lessons across 8 modules.</strong> Summing the effort tags gives roughly <strong>50 hours of lesson work</strong>; with recommended primary-source reading and the staged capstone, plan on <strong>70–90 hours</strong> total. These are estimates and shift with your pace and depth.</p>
+  <p><strong>36 lessons across 8 modules.</strong> Summing the effort tags gives roughly <strong>50 hours of lesson work</strong>; with recommended primary-source reading and the staged capstone, plan on <strong>70-90 hours</strong> total. These are estimates and shift with your pace and depth.</p>
 
   <p class="legend">
     <strong>Status:</strong>
@@ -98,14 +98,14 @@
   <p class="legend">
     <strong>Effort</strong> (lesson work, excluding reading):
     <span class="ef">S</span> ≈ 30&nbsp;min ·
-    <span class="ef">M</span> ≈ 1–2&nbsp;hrs ·
-    <span class="ef">L</span> ≈ 3–5&nbsp;hrs, multiple sessions.
+    <span class="ef">M</span> ≈ 1-2&nbsp;hrs ·
+    <span class="ef">L</span> ≈ 3-5&nbsp;hrs, multiple sessions.
   </p>
 
   <!-- ===================== MODULE 0 ===================== -->
   <div class="module">
     <h2>Module 0 · Orientation</h2>
-    <p class="module-goal">The one concept to learn before writing any code — read once, then build. Not a project lesson.</p>
+    <p class="module-goal">The one concept to learn before writing any code: read once, then build. Not a project lesson.</p>
     <p class="outcomes-h">After the primer you can:</p>
     <ul class="outcomes">
       <li>State the three ownership rules and predict whether a snippet compiles.</li>
@@ -116,8 +116,8 @@
       <li><span class="lnum">○</span><div><div class="ltitle"><a href="./0000-ownership-and-moves.html">Orientation — The Ownership Model</a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">A read-once primer. Borrowing, lifetimes, and the borrow checker are taught later, where a project needs them.</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;None — start here.</p>
-      <p class="checkpoint"><b>Checkpoint</b> &nbsp;No deliverable — orientation only. The model is put to work for real starting in Module 1.</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;None; start here.</p>
+      <p class="checkpoint"><b>Checkpoint</b> &nbsp;No deliverable; orientation only. The model is put to work for real starting in Module 1.</p>
     </div>
   </div>
 
@@ -146,7 +146,7 @@
   <!-- ===================== MODULE 2 ===================== -->
   <div class="module">
     <h2>Module 2 · Structuring a program</h2>
-    <p class="module-goal">Grow <code>rwc</code> into a multi-file, stdin-aware tool — one real feature per lesson, refactored while the tests stay green. Each new feature is what introduces the concept.</p>
+    <p class="module-goal">Grow <code>rwc</code> into a multi-file, stdin-aware tool: one real feature per lesson, refactored while the tests stay green. Each new feature is what introduces the concept.</p>
     <p class="outcomes-h">By the end you can:</p>
     <ul class="outcomes">
       <li>Pass data by reference (<code>&amp;</code>, <code>&amp;mut</code>) and state the borrowing rules.</li>
@@ -155,17 +155,17 @@
       <li>Choose <code>&amp;str</code> vs <code>String</code> deliberately, and read/write basic lifetime annotations.</li>
     </ul>
     <ul class="lessons">
-      <li><span class="lnum">04</span><div><div class="ltitle"><a href="./0004-borrowing.html">Borrowing &amp; references</a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: <code>rwc</code> grows to count several files and total them — shared <code>&amp;</code>, mutable <code>&amp;mut</code>, and the shared-XOR-mutable rule, with the Lesson 3 tests as the safety net.</div></div></li>
+      <li><span class="lnum">04</span><div><div class="ltitle"><a href="./0004-borrowing.html">Borrowing &amp; references</a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: <code>rwc</code> grows to count several files and total them. Shared <code>&amp;</code>, mutable <code>&amp;mut</code>, and the shared-XOR-mutable rule, with the Lesson 3 tests as the safety net.</div></div></li>
       <li><span class="lnum">05</span><div><div class="ltitle"><a href="./0005-borrow-checker-errors.html">Reading borrow-checker errors</a><span class="ef">S</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: deliberately provoke the four classic <code>E03xx</code> errors in <code>rwc</code> (<code>E0596</code>, <code>E0382</code>, <code>E0502</code>, <code>E0499</code>); read each message structurally and apply its standard fix.</div></div></li>
       <li><span class="lnum">06</span><div><div class="ltitle"><a href="./0006-structs-enums.html">Structs &amp; enums</a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: a <code>Counts</code> struct replacing the <code>(usize, usize, usize)</code> tuple, and a <code>Source</code> enum for <em>file vs stdin</em> input. First lesson with <code>src/lib.rs</code>, so doc-tests land here.</div></div></li>
-      <li><span class="lnum">07</span><div><div class="ltitle"><a href="./0007-pattern-matching.html">Pattern matching with <code>match</code></a><span class="ef">S</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: the <code>Source</code> enum's <code>match</code> revisited in depth — exhaustiveness as a compile-time guarantee (add a variant, watch every <code>match</code> demand it), plus guards, bindings, and <code>if let</code>/<code>let else</code>.</div></div></li>
+      <li><span class="lnum">07</span><div><div class="ltitle"><a href="./0007-pattern-matching.html">Pattern matching with <code>match</code></a><span class="ef">S</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: the <code>Source</code> enum's <code>match</code> revisited in depth. Exhaustiveness as a compile-time guarantee (add a variant, watch every <code>match</code> demand it), plus guards, bindings, and <code>if let</code>/<code>let else</code>.</div></div></li>
       <li><span class="lnum">08</span><div><div class="ltitle"><a href="./0008-strings-and-slices.html">Strings &amp; slices: <code>String</code> vs <code>&amp;str</code></a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: a character count added beside the byte count; <code>String</code> vs <code>&amp;str</code>, slicing, and why a byte index can split a UTF-8 character.</div></div></li>
       <li><span class="lnum">09</span><div><div class="ltitle"><a href="./0009-lifetimes.html">Lifetimes: borrowed data in types</a><span class="ef">M</span><span class="st done">Complete</span></div><div class="ldesc">Anchor: a struct that holds a <code>&amp;str</code> (a per-file <code>Report&lt;'a&gt;</code>) is exactly where <code>'a</code> first becomes necessary; the elision rules and <code>'static</code>. Advanced cases revisited under async (Module 6).</div></div></li>
     </ul>
     <div class="mrow">
       <p class="prereq"><b>Prerequisites</b> &nbsp;Module 1.</p>
       <p class="checkpoint"><b>Checkpoint</b> &nbsp;<code>rwc</code> counts multiple files (with a total line), reads stdin when given no path, and is built from named tested functions plus a <code>Counts</code> struct and <code>Source</code> enum. The Module 1 tests still pass; zero <code>clippy</code> warnings.</p>
-      <p class="review"><b>Spaced review</b> &nbsp;Re-explain why <code>&amp;path</code> (Lesson 1) was a borrow — now using the borrowing rules — and predict the error if the <code>&amp;</code> is removed.</p>
+      <p class="review"><b>Spaced review</b> &nbsp;Re-explain why <code>&amp;path</code> (Lesson 1) was a borrow, now using the borrowing rules, and predict the error if the <code>&amp;</code> is removed.</p>
       <p class="practice"><b>Practice</b> &nbsp;Run <code>clippy</code>; reconcile its suggestions with the borrowing rules you just learned.</p>
     </div>
   </div>
@@ -173,7 +173,7 @@
   <!-- ===================== MODULE 3 ===================== -->
   <div class="module">
     <h2>Module 3 · Dependencies &amp; the ecosystem</h2>
-    <p class="module-goal">Turn <code>rwc</code> into a polished, flag-driven tool using external crates — now that structs (needed by clap's derive API) exist.</p>
+    <p class="module-goal">Turn <code>rwc</code> into a polished, flag-driven tool using external crates, now that structs (needed by clap's derive API) exist.</p>
     <p class="outcomes-h">By the end you can:</p>
     <ul class="outcomes">
       <li>Add, pin, and update crate dependencies; explain semver and the lockfile.</li>
@@ -186,9 +186,9 @@
       <li><span class="lnum">12</span><div><div class="ltitle">Ergonomic errors: <code>anyhow</code> &amp; <code>thiserror</code><span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: per-file error context (<em>which</em> file failed and why) across the multi-file tool.</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1–2 (clap's derive needs the struct from Lesson 6).</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1-2 (clap's derive needs the struct from Lesson 6).</p>
       <p class="checkpoint"><b>Checkpoint</b> &nbsp;<code>rwc</code> v2: flags with generated <code>--help</code>, validated input, per-file context-rich errors, a README, pinned dependencies. Ships as a release binary.</p>
-      <p class="review"><b>Spaced review</b> &nbsp;Contrast <code>anyhow</code> errors with the std <code>Box&lt;dyn Error&gt;</code> approach from Lesson 2 — what each buys and costs.</p>
+      <p class="review"><b>Spaced review</b> &nbsp;Contrast <code>anyhow</code> errors with the std <code>Box&lt;dyn Error&gt;</code> approach from Lesson 2: what each buys and costs.</p>
     </div>
   </div>
 
@@ -209,11 +209,11 @@
       <li><span class="lnum">14</span><div><div class="ltitle">Iterators &amp; closures<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: express count-and-rank as a <code>map</code>/<code>filter</code>/<code>fold</code> pipeline.</div></div></li>
       <li><span class="lnum">15</span><div><div class="ltitle">Traits: shared behaviour (<code>Display</code>, <code>From</code>)<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: implement <code>Display</code> for a report and <code>From</code> for conversions. (Traits, part 1 of 2.)</div></div></li>
       <li><span class="lnum">16</span><div><div class="ltitle">Generics &amp; trait bounds<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: a generic <code>Report&lt;T&gt;</code> bounded by the traits from Lesson 15. (Traits, part 2 of 2.)</div></div></li>
-      <li><span class="lnum">17</span><div><div class="ltitle">Static vs dynamic dispatch<span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">Generics vs <code>dyn</code> trait objects — the trade-off, revisiting <code>Box&lt;dyn Error&gt;</code> from Lesson 2.</div></div></li>
+      <li><span class="lnum">17</span><div><div class="ltitle">Static vs dynamic dispatch<span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">Generics vs <code>dyn</code> trait objects: the trade-off, revisiting <code>Box&lt;dyn Error&gt;</code> from Lesson 2.</div></div></li>
       <li><span class="lnum">18</span><div><div class="ltitle">Modules &amp; project structure<span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: split <code>wordfreq</code> across modules with an integration-test suite.</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1–3.</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1-3.</p>
       <p class="checkpoint"><b>Checkpoint</b> &nbsp;<code>wordfreq</code>: reads input, ranks the top-N words, prints via a generic <code>Report</code>, modularized and tested.</p>
       <p class="practice"><b>Practice</b> &nbsp;Compare your iterator pipeline against an idiomatic solution from Rust by Example or a forum thread.</p>
     </div>
@@ -222,8 +222,8 @@
   <!-- ===================== INTERLEAVED CHECKPOINT A ===================== -->
   <div class="interleave">
     <h3><span class="tag">Interleaved checkpoint A</span> &nbsp;after Module 4</h3>
-    <p>A mixed problem set on an <em>unfamiliar</em> short program, solved from memory — tasks drawn at random across Modules 1–4:</p>
-    <p>① Predict its compile/borrow errors and fix them (M1–2). &nbsp;② Replace a chain of <code>if</code>s with an <code>enum</code> + <code>match</code> (M2). &nbsp;③ Rewrite a manual loop as an iterator pipeline (M4). &nbsp;④ Add a <code>clap</code> flag and a context-rich error (M3). &nbsp;⑤ Implement <code>Display</code> for one of its types (M4).</p>
+    <p>A mixed problem set on an <em>unfamiliar</em> short program, solved from memory, with tasks drawn at random across Modules 1-4:</p>
+    <p>① Predict its compile/borrow errors and fix them (M1-2). &nbsp;② Replace a chain of <code>if</code>s with an <code>enum</code> + <code>match</code> (M2). &nbsp;③ Rewrite a manual loop as an iterator pipeline (M4). &nbsp;④ Add a <code>clap</code> flag and a context-rich error (M3). &nbsp;⑤ Implement <code>Display</code> for one of its types (M4).</p>
     <p><b>Acceptance:</b> solved without notes; compiles; <code>clippy</code>-clean; you can name which module each task exercised.</p>
   </div>
 
@@ -245,7 +245,7 @@
       <li><span class="lnum">22</span><div><div class="ltitle">Logging &amp; observability<span class="ef">S</span><span class="st soon">Planned</span></div><div class="ldesc">The <code>tracing</code>/<code>log</code> ecosystem; verbosity flags wired through clap.</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1–4.</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1-4.</p>
       <p class="checkpoint"><b>Checkpoint</b> &nbsp;A data-summarizer and a <code>grep</code>-lite, both tested, both reading stdin or files, both logging at adjustable verbosity.</p>
       <p class="review"><b>Spaced review</b> &nbsp;Interleave Module 4 iterators over the parsed records before summarizing.</p>
     </div>
@@ -259,17 +259,17 @@
     <ul class="outcomes">
       <li>Use <code>Rc</code>/<code>Arc</code>, <code>RefCell</code>/<code>Mutex</code>, and explain when each is needed.</li>
       <li>Spawn threads, share data with <code>Arc&lt;Mutex&lt;…&gt;&gt;</code> and channels, and reason about <code>Send</code>/<code>Sync</code>.</li>
-      <li>Explain the async model — futures, <code>.await</code>, executors — and write async functions on <code>tokio</code>.</li>
+      <li>Explain the async model (futures, <code>.await</code>, executors) and write async functions on <code>tokio</code>.</li>
     </ul>
     <ul class="lessons">
-      <li><span class="lnum">23</span><div><div class="ltitle">Smart pointers &amp; interior mutability<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc"><code>Box</code>, <code>Rc</code>, <code>RefCell</code> — shared ownership and mutation through a shared reference.</div></div></li>
+      <li><span class="lnum">23</span><div><div class="ltitle">Smart pointers &amp; interior mutability<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc"><code>Box</code>, <code>Rc</code>, <code>RefCell</code>: shared ownership and mutation through a shared reference.</div></div></li>
       <li><span class="lnum">24</span><div><div class="ltitle">Threads, <code>Arc</code>/<code>Mutex</code> &amp; channels<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Anchor: parallelize <code>wordfreq</code>; <code>Send</code>/<code>Sync</code> as the safety boundary.</div></div></li>
       <li><span class="lnum">25</span><div><div class="ltitle">The async model: futures &amp; <code>.await</code><span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">What a future is, what <code>.await</code> does, why async differs from threads (and the lifetimes that surface). (Async, part 1 of 2.)</div></div></li>
       <li><span class="lnum">26</span><div><div class="ltitle">Running async on <code>tokio</code><span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">The runtime, tasks, async IO; an async multi-URL fetcher. (Async, part 2 of 2.)</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1–5 (lifetimes from Lesson 9 resurface in async).</p>
-      <p class="checkpoint"><b>Checkpoint</b> &nbsp;A concurrent or async utility — a parallel directory processor or an async multi-URL fetcher — that compiles clean under <code>Send</code>/<code>Sync</code> and is tested.</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1-5 (lifetimes from Lesson 9 resurface in async).</p>
+      <p class="checkpoint"><b>Checkpoint</b> &nbsp;A concurrent or async utility (a parallel directory processor or an async multi-URL fetcher) that compiles clean under <code>Send</code>/<code>Sync</code> and is tested.</p>
       <p class="review"><b>Spaced review</b> &nbsp;Trace how ownership (Module 1) makes a data race a <em>compile</em> error here, not a runtime one.</p>
       <p class="practice"><b>Practice</b> &nbsp;Bring a dense async error to r/rust or the Discord <code>#beginners</code> channel and dissect it.</p>
     </div>
@@ -278,7 +278,7 @@
   <!-- ===================== INTERLEAVED CHECKPOINT B ===================== -->
   <div class="interleave">
     <h3><span class="tag">Interleaved checkpoint B</span> &nbsp;after Module 6</h3>
-    <p>A cumulative exercise on your own <code>wordfreq</code>, drawing across Modules 1–6:</p>
+    <p>A cumulative exercise on your own <code>wordfreq</code>, drawing across Modules 1-6:</p>
     <p>① Parallelize the hot loop with <code>Arc&lt;Mutex&gt;</code> or channels (M6) and justify each ownership move (M1). &nbsp;② Convert one path to <code>async</code> and explain the lifetime that appears (M2/M6). &nbsp;③ Route all failures through <code>anyhow</code> with context (M3). &nbsp;④ Feed it JSON or CSV input via <code>serde</code> (M5). &nbsp;⑤ Add an integration test for the concurrent path (M1/M4).</p>
     <p><b>Acceptance:</b> compiles under <code>Send</code>/<code>Sync</code>; tests pass; you can defend each concurrency and ownership decision aloud.</p>
   </div>
@@ -303,9 +303,9 @@
       <li><span class="lnum">32</span><div><div class="ltitle">Testing &amp; shipping a service<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Integration tests against the running app, configuration, release builds.</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1–6 (axum is async; shared state uses <code>Arc</code>).</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1-6 (axum is async; shared state uses <code>Arc</code>).</p>
       <p class="checkpoint"><b>Checkpoint</b> &nbsp;A small CRUD web service with JSON endpoints, a database, error→status mapping, and an integration-test suite that passes against the running app.</p>
-      <p class="review"><b>Spaced review</b> &nbsp;The handlers reuse serde (M5), errors (M3), and Arc (M6) — locate each.</p>
+      <p class="review"><b>Spaced review</b> &nbsp;The handlers reuse serde (M5), errors (M3), and Arc (M6); locate each.</p>
     </div>
   </div>
 
@@ -324,7 +324,7 @@
       <li><span class="lnum">35</span><div><div class="ltitle">Capstone III — tests, docs &amp; release<span class="ef">M</span><span class="st soon">Planned</span></div><div class="ldesc">Milestone: full test pass, README/usage docs, release binaries; a written retrospective.</div></div></li>
     </ul>
     <div class="mrow">
-      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1–7 and both interleaved checkpoints.</p>
+      <p class="prereq"><b>Prerequisites</b> &nbsp;Modules 1-7 and both interleaved checkpoints.</p>
       <p class="checkpoint"><b>Checkpoint (summative)</b> &nbsp;Service + CLI client meet the mission's success criteria: a non-trivial CLI shipped, a web service standing, and a retrospective explaining the ownership/borrowing/error decisions made.</p>
     </div>
   </div>
@@ -337,7 +337,7 @@
     <div class="nav-links">
       <a href="../reference/glossary.html">📖 Glossary</a>
       <a href="./0000-ownership-and-moves.html">Start ▸ Orientation</a>
-      <a href="./0011-clap-flags.html">Current ▸ Lesson 11</a>
+      <a href="./0012-anyhow-thiserror.html">Current ▸ Lesson 12</a>
     </div>
   </div>
 </div>

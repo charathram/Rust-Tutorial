@@ -9,12 +9,12 @@
 <div class="wrap">
   <p class="eyebrow">Rust · Lesson 9 · Build-along</p>
   <h1>Lifetimes: borrowed data in types</h1>
-  <p class="subtitle">You wrote <code>first_chars(s: &amp;str) -&gt; &amp;str</code> in Lesson 8 and <code>Source::name(&amp;self) -&gt; &amp;str</code> back in Lesson 6 — both return a reference borrowed out of their input, and both compiled without a word about how long that borrow lasts. A <em>lifetime</em> is the compiler's name for exactly that: how long a reference stays valid. This lesson makes it visible. You will read the annotation <code>'a</code>, learn the elision rules that let you usually omit it, and hit the one place it becomes mandatory — a <code>struct</code> that holds a <code>&amp;str</code>. You build that struct: a <code>Report&lt;'a&gt;</code> that borrows its label instead of owning it.</p>
+  <p class="subtitle">You wrote <code>first_chars(s: &amp;str) -&gt; &amp;str</code> in Lesson 8 and <code>Source::name(&amp;self) -&gt; &amp;str</code> back in Lesson 6. Both return a reference borrowed out of their input, and both compiled without a word about how long that borrow lasts. A <em>lifetime</em> is the compiler's name for exactly that: how long a reference stays valid. This lesson makes it visible. You will read the annotation <code>'a</code>, learn the elision rules that let you usually omit it, and hit the one place it becomes mandatory: a <code>struct</code> that holds a <code>&amp;str</code>. You build that struct: a <code>Report&lt;'a&gt;</code> that borrows its label instead of owning it.</p>
 
   <h2>Lesson goals</h2>
   <p>By the end of this lesson you will be able to:</p>
   <ul>
-    <li>Say what a lifetime is — a region of code for which a reference is valid — and read the <code>'a</code> annotation.</li>
+    <li>Say what a lifetime is (a region of code for which a reference is valid) and read the <code>'a</code> annotation.</li>
     <li>State the three <em>elision</em> rules and explain why <code>name</code> and <code>first_chars</code> need no annotation.</li>
     <li>Write a <code>struct</code> that stores a reference, giving it a lifetime parameter (<code>Report&lt;'a&gt;</code>), and know why the compiler demands one.</li>
     <li>Recognise <code>E0106</code> (missing lifetime) and <code>E0515</code> (returning a borrow of a local) and fix them.</li>
@@ -23,20 +23,20 @@
 
   <div class="note">
     <span class="label">Starting point</span>
-    Work in <code>0009-rwc/</code>, a clean copy of your finished Lesson 8 tool — <code>Counts</code> with its <code>chars</code> field, <code>first_chars</code>, and the <code>Source</code> enum, tests green. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write — attempt it, then open <em>Show solution</em> to check.
+    Work in <code>0009-rwc/</code>, a clean copy of your finished Lesson 8 tool: <code>Counts</code> with its <code>chars</code> field, <code>first_chars</code>, and the <code>Source</code> enum, tests green. Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write. Attempt it, then open <em>Show solution</em> to check.
   </div>
 
   <h2>Why lifetimes, why now</h2>
-  <p>Every reference in Rust is valid only for a stretch of the program — from where it is created to where the thing it points at goes away. The borrow checker has enforced that since Lesson 4: a reference may never outlive its owner. A <strong>lifetime</strong> is simply the compiler's name for that stretch. Most of the time you never write one, because the compiler infers it. You have been leaning on that inference for eight lessons.</p>
-  <p>It stops being invisible the moment a <em>type</em> stores a reference. <code>rwc</code> is about to do that. Right now <code>main</code> prints each source's counts and label inline and throws the pieces away. This lesson bundles them into a small type — a <code>Report</code> that pairs a source's <code>Counts</code> with its <em>label</em> — and the label is borrowed, not copied. A struct that holds a <code>&amp;str</code> is exactly the case the compiler cannot figure out on its own, so it makes you name the lifetime. That is the whole reason this lesson exists here: <code>Report</code> is the first type in the course that has to carry a <code>'a</code>.</p>
+  <p>Every reference in Rust is valid only for a stretch of the program, from where it is created to where the thing it points at goes away. The borrow checker has enforced that since Lesson 4: a reference may never outlive its owner. A <strong>lifetime</strong> is simply the compiler's name for that stretch. Most of the time you never write one, because the compiler infers it. You have been leaning on that inference for eight lessons.</p>
+  <p>It stops being invisible the moment a <em>type</em> stores a reference. <code>rwc</code> is about to do that. Right now <code>main</code> prints each source's counts and label inline and throws the pieces away. This lesson bundles them into a small type: a <code>Report</code> that pairs a source's <code>Counts</code> with its <em>label</em>. The label is borrowed, not copied. A struct that holds a <code>&amp;str</code> is exactly the case the compiler cannot figure out on its own, so it makes you name the lifetime. That is the whole reason this lesson exists here: <code>Report</code> is the first type in the course that has to carry a <code>'a</code>.</p>
 
   <h2>Step 1 — What a lifetime is</h2>
-  <p>A lifetime is a region of code. A reference is tagged with the region during which the data it points to is guaranteed to exist, and the borrow checker refuses any use of the reference outside that region. You already saw the failure mode in Lesson 5 — use a value after its owner drops and the borrow checker stops you. Lifetimes are the bookkeeping behind that check.</p>
+  <p>A lifetime is a region of code. A reference is tagged with the region during which the data it points to is guaranteed to exist, and the borrow checker refuses any use of the reference outside that region. You already saw the failure mode in Lesson 5: use a value after its owner drops and the borrow checker stops you. Lifetimes are the bookkeeping behind that check.</p>
   <p>The annotation is an apostrophe and a name, conventionally <code>'a</code> (read "tick-a"). It attaches to a reference type:</p>
   <pre><code>&amp;str          <span class="c">// a string slice (lifetime elided — the compiler picks it)</span>
 &amp;'a str       <span class="c">// a string slice valid for the lifetime named 'a</span>
 &amp;'a mut T     <span class="c">// a mutable reference valid for 'a</span></code></pre>
-  <p><code>'a</code> is not a duration in seconds and not a value you compute. It is a <em>label the compiler uses to relate references to one another</em> — "this output borrows from that input," "this field borrows from whatever built the struct." You are not telling the compiler how long anything lives; you are telling it <em>which</em> things must live at least as long as which others. It checks the rest.</p>
+  <p><code>'a</code> is not a duration in seconds and not a value you compute. It is a label the compiler uses to relate references to one another: "this output borrows from that input," "this field borrows from whatever built the struct." You are not telling the compiler how long anything lives; you are telling it <em>which</em> things must live at least as long as which others. It checks the rest.</p>
 
   <h2>Step 2 — Elision: why you rarely write one</h2>
   <p>If every reference has a lifetime, why have you never typed one? Because of <em>lifetime elision</em>: three rules the compiler applies to fill in the obvious cases so you don't have to. The rules, in order:</p>
@@ -47,12 +47,12 @@
   </ol>
   <p>Two functions you already wrote are covered by these. Take <code>Source::name</code>. It has one reference parameter, <code>&amp;self</code>, so rule 1 gives it a lifetime and rule 3 hands that same lifetime to the returned <code>&amp;str</code>. Written out in full, the elided signature is:</p>
   <pre><code>pub fn name&lt;'a&gt;(&amp;'a self) -&gt; &amp;'a str   <span class="c">// what the compiler infers from `fn name(&amp;self) -> &amp;str`</span></code></pre>
-  <p>The explicit form says: the borrowed name lives as long as the borrow of <code>self</code> — which is right, since the name points into <code>self</code>.</p>
-  <p><strong>Your turn</strong> — do the same for Lesson 8's <code>first_chars</code>. Its signature is <code>fn first_chars(s: &amp;str, n: usize) -&gt; &amp;str</code>. It has no <code>self</code>; it has exactly one reference parameter (<code>s</code> — <code>n</code> is not a reference). Which rule assigns the output lifetime, and what is the explicit signature?</p>
+  <p>The explicit form says: the borrowed name lives as long as the borrow of <code>self</code>, which is right, since the name points into <code>self</code>.</p>
+  <p><strong>Your turn.</strong> Do the same for Lesson 8's <code>first_chars</code>. Its signature is <code>fn first_chars(s: &amp;str, n: usize) -&gt; &amp;str</code>. It has no <code>self</code>; it has exactly one reference parameter (<code>s</code>; <code>n</code> is not a reference). Which rule assigns the output lifetime, and what is the explicit signature?</p>
   <details class="solution">
     <summary>Show solution</summary>
     <pre><code>pub fn first_chars&lt;'a&gt;(s: &amp;'a str, n: usize) -&gt; &amp;'a str</code></pre>
-    <p>Rule 1 gives <code>s</code> the lifetime <code>'a</code>; with exactly one input lifetime, rule 2 assigns it to the output. The returned slice borrows from <code>s</code> and cannot outlive it — which is exactly what <code>first_chars</code> does. The explicit and elided forms compile identically.</p>
+    <p>Rule 1 gives <code>s</code> the lifetime <code>'a</code>; with exactly one input lifetime, rule 2 assigns it to the output. The returned slice borrows from <code>s</code> and cannot outlive it, which is exactly what <code>first_chars</code> does. The explicit and elided forms compile identically.</p>
   </details>
   <p>Elision only reaches the <em>common</em> shapes. When there is more than one input reference and no <code>self</code>, rule 2 doesn't apply and rule 3 doesn't apply, so the compiler cannot guess which input the output borrows from. Watch it refuse a function that takes two slices and returns one:</p>
   <pre><code>fn longest(a: &amp;str, b: &amp;str) -&gt; &amp;str {
@@ -70,10 +70,10 @@
   <pre><code>fn longest&lt;'a&gt;(a: &amp;'a str, b: &amp;'a str) -&gt; &amp;'a str {
     if a.len() &gt;= b.len() { a } else { b }
 }</code></pre>
-  <p><code>rwc</code> has no such function — but it is about to grow the <em>other</em> case elision never covers: a struct that stores a reference.</p>
+  <p><code>rwc</code> has no such function, but it is about to grow the <em>other</em> case elision never covers: a struct that stores a reference.</p>
 
   <h2>Step 3 — A struct that borrows: <code>Report&lt;'a&gt;</code></h2>
-  <p>The plan: a <code>Report</code> pairs one source's <code>Counts</code> with its label — the string <code>main</code> prints at the end of each row (<code>"demo.txt"</code>, <code>"file.md (markdown)"</code>, <code>"total"</code>). The <code>Counts</code> is <code>Copy</code>, so the <code>Report</code> owns it outright. The label is text that already lives elsewhere, so the <code>Report</code> <em>borrows</em> it — a <code>&amp;str</code> field.</p>
+  <p>The plan: a <code>Report</code> pairs one source's <code>Counts</code> with its label, the string <code>main</code> prints at the end of each row (<code>"demo.txt"</code>, <code>"file.md (markdown)"</code>, <code>"total"</code>). The <code>Counts</code> is <code>Copy</code>, so the <code>Report</code> owns it outright. The label is text that already lives elsewhere, so the <code>Report</code> <em>borrows</em> it: a <code>&amp;str</code> field.</p>
   <p>Try to write that the obvious way and the compiler stops you:</p>
   <pre><code>pub struct Report {
     label: &amp;str,
@@ -90,7 +90,7 @@ help: consider introducing a named lifetime parameter
 1 ~ pub struct Report&lt;'a&gt; {
 2 ~     label: &amp;'a str,
   |</code></pre>
-  <p>A struct that stores a reference must declare a lifetime parameter, for a concrete reason: the compiler has to guarantee the <code>Report</code> never outlives the text its <code>label</code> points into. The <code>'a</code> is the handle it uses to enforce that — it means "this <code>Report</code> is valid only for the region <code>'a</code>, the region its label is borrowed for." Elision can't help here: there is no function signature to read the borrow from, just a field. So you write it. The compiler even suggests the exact fix. Add the struct to <code>lib.rs</code>, near <code>Counts</code>:</p>
+  <p>A struct that stores a reference must declare a lifetime parameter, for a concrete reason: the compiler has to guarantee the <code>Report</code> never outlives the text its <code>label</code> points into. The <code>'a</code> is the handle it uses to enforce that: it means "this <code>Report</code> is valid only for the region <code>'a</code>, the region its label is borrowed for." Elision can't help here: there is no function signature to read the borrow from, just a field. So you write it. The compiler even suggests the exact fix. Add the struct to <code>lib.rs</code>, near <code>Counts</code>:</p>
   <pre><code><span class="c">// src/lib.rs — first_chars, Counts, and Source stay exactly as they are</span>
 <span class="add">/// One source's output row: its `Counts` plus a borrowed label.</span>
 <span class="add">///</span>
@@ -109,7 +109,7 @@ help: consider introducing a named lifetime parameter
 <span class="add">    label: &amp;'a str,</span>
 <span class="add">    counts: Counts,</span>
 <span class="add">}</span></code></pre>
-  <p>Now the <code>impl</code> block. The <code>impl</code> also carries the lifetime — you write <code>impl&lt;'a&gt; Report&lt;'a&gt;</code>, declaring <code>'a</code> after <code>impl</code> and using it on the type, the same way a generic parameter is declared then used. The constructor borrows the label and stores it:</p>
+  <p>Now the <code>impl</code> block. The <code>impl</code> also carries the lifetime: you write <code>impl&lt;'a&gt; Report&lt;'a&gt;</code>, declaring <code>'a</code> after <code>impl</code> and using it on the type, the same way a generic parameter is declared then used. The constructor borrows the label and stores it:</p>
   <pre><code><span class="add">impl&lt;'a&gt; Report&lt;'a&gt; {</span>
 <span class="add">    /// Builds a report borrowing `label` and holding a copy of `counts`.</span>
 <span class="add">    pub fn new(label: &amp;'a str, counts: Counts) -&gt; Report&lt;'a&gt; {</span>
@@ -123,8 +123,8 @@ help: consider introducing a named lifetime parameter
 <span class="add">    }</span>
     <span class="c">// ... counts and line go here (below) ...</span>
 <span class="add">}</span></code></pre>
-  <p>Notice <code>label</code> takes no annotation: it has <code>&amp;self</code>, so elision rule 3 gives the returned <code>&amp;str</code> the lifetime of <code>&amp;self</code>. Only the <code>struct</code> and <code>new</code> — where the borrow first enters the type — need <code>'a</code> spelled out.</p>
-  <p><strong>Your turn</strong> — add <code>counts</code>, a getter mirroring <code>label</code> but returning the <code>Counts</code> by value (it is <code>Copy</code>, so this borrows nothing):</p>
+  <p>Notice <code>label</code> takes no annotation: it has <code>&amp;self</code>, so elision rule 3 gives the returned <code>&amp;str</code> the lifetime of <code>&amp;self</code>. Only the <code>struct</code> and <code>new</code>, where the borrow first enters the type, need <code>'a</code> spelled out.</p>
+  <p><strong>Your turn.</strong> Add <code>counts</code>, a getter mirroring <code>label</code> but returning the <code>Counts</code> by value (it is <code>Copy</code>, so this borrows nothing):</p>
   <pre><code><span class="add">    /// A copy of the counts. `Counts` is `Copy`, so this owns nothing borrowed.</span>
 <span class="add">    pub fn counts(&amp;self) -&gt; Counts {</span>
 <span class="add">        <span class="todo">// TODO (your turn): hand back the stored counts</span></span>
@@ -135,7 +135,7 @@ help: consider introducing a named lifetime parameter
         self.counts
     }</code></pre>
   </details>
-  <p><strong>Your turn</strong> — add <code>line</code>, which formats the report as one output row. You already build this exact row in <code>main.rs</code>'s loop:</p>
+  <p><strong>Your turn.</strong> Add <code>line</code>, which formats the report as one output row. You already build this exact row in <code>main.rs</code>'s loop:</p>
   <pre><code>        println!(
             "{:&gt;6} {:&gt;6} {:&gt;6} {:&gt;6} {}",
             counts.lines, counts.words, counts.bytes, counts.chars, source.describe()
@@ -166,7 +166,7 @@ help: consider introducing a named lifetime parameter
   </details>
 
   <h2>Step 4 — Use <code>Report</code> in <code>main</code></h2>
-  <p>Now route the output through <code>Report</code>. In the loop, build a report from each source's label and counts, then print its line. The label comes from <code>source.describe()</code>, which returns a <code>String</code>; the <code>Report</code> borrows it, so the <code>String</code> has to live at least as long as the report — binding it to <code>label</code> first gives it a name that outlives the borrow. First the import:</p>
+  <p>Now route the output through <code>Report</code>. In the loop, build a report from each source's label and counts, then print its line. The label comes from <code>source.describe()</code>, which returns a <code>String</code>; the <code>Report</code> borrows it, so the <code>String</code> has to live at least as long as the report. Binding it to <code>label</code> first gives it a name that outlives the borrow. First the import:</p>
   <pre><code><span class="add">use rwc::{Counts, Report, Source};</span>
 use std::env;
 use std::error::Error;</code></pre>
@@ -187,15 +187,15 @@ use std::error::Error;</code></pre>
         let report = Report::new(&amp;label, counts);
         println!("{}", report.line());</code></pre>
   </details>
-  <p>Two things are worth naming. First, <code>counts</code> is still usable on the next line (<code>total.add(counts)</code>) even though you passed it to <code>Report::new</code> — because <code>Counts</code> is <code>Copy</code>, that was a copy, not a move. Second, <code>Report::new(&amp;label, counts)</code> passes <code>&amp;label</code> (a <code>&amp;String</code>) where a <code>&amp;str</code> is expected; the same deref coercion you met in Lesson 8 applies.</p>
+  <p>Two things are worth naming. First, <code>counts</code> is still usable on the next line (<code>total.add(counts)</code>) even though you passed it to <code>Report::new</code>. Because <code>Counts</code> is <code>Copy</code>, that was a copy, not a move. Second, <code>Report::new(&amp;label, counts)</code> passes <code>&amp;label</code> (a <code>&amp;String</code>) where a <code>&amp;str</code> is expected; the same deref coercion you met in Lesson 8 applies.</p>
   <p>The total row uses <code>Report</code> too. Its label is the literal <code>"total"</code>:</p>
   <pre><code>    if sources.len() &gt; 1 {
 <span class="add">        println!("{}", Report::new("total", total).line());</span>
     }</code></pre>
-  <p>That literal is where <code>'static</code> shows up — the subject of the next step.</p>
+  <p>That literal is where <code>'static</code> shows up, the subject of the next step.</p>
 
   <h2>Step 5 — Dangling borrows, and <code>'static</code></h2>
-  <p>The <code>'a</code> on <code>Report</code> is not decoration; it is a rule the compiler enforces. To see it bite, try to write a function that builds a <code>Report</code> from a <code>String</code> it owns and returns it:</p>
+  <p>The <code>'a</code> on <code>Report</code> is a rule the compiler enforces, not decoration. To see it bite, try to write a function that builds a <code>Report</code> from a <code>String</code> it owns and returns it:</p>
   <pre><code>fn report_for(name: &amp;str) -&gt; Report&lt;'static&gt; {
     let owned = String::from(name);
     Report::new(&amp;owned, Counts::default())
@@ -208,14 +208,14 @@ use std::error::Error;</code></pre>
   |     |           |
   |     |           `owned` is borrowed here
   |     returns a value referencing data owned by the current function</code></pre>
-  <p>The <code>Report</code> would borrow <code>owned</code>, but <code>owned</code> is dropped when the function returns — so the returned <code>Report</code> would point at freed memory. In a language without lifetimes this compiles and corrupts at runtime; here it is a compile error. The <code>'a</code> is what lets the compiler catch it: it can see the <code>Report</code>'s lifetime would have to outlive <code>owned</code>, which is impossible. (The fix is to make the caller own the text and lend it in, exactly as <code>main</code> does with <code>label</code>.)</p>
-  <p>So why does <code>Report::new("total", total)</code> in <code>main</code> work? Because a string literal is special: it is baked into the compiled binary and lives for the entire run of the program. Its type is <code>&amp;'static str</code> — the lifetime <code>'static</code> means "valid for the whole program." A <code>&amp;'static str</code> satisfies any lifetime a <code>Report</code> could need, so <code>Report::new("total", total)</code> is a <code>Report&lt;'static&gt;</code> and never dangles.</p>
+  <p>The <code>Report</code> would borrow <code>owned</code>, but <code>owned</code> is dropped when the function returns, so the returned <code>Report</code> would point at freed memory. In a language without lifetimes this compiles and corrupts at runtime; here it is a compile error. The <code>'a</code> is what lets the compiler catch it: it can see the <code>Report</code>'s lifetime would have to outlive <code>owned</code>, which is impossible. (The fix is to make the caller own the text and lend it in, exactly as <code>main</code> does with <code>label</code>.)</p>
+  <p>So why does <code>Report::new("total", total)</code> in <code>main</code> work? Because a string literal is special: it is baked into the compiled binary and lives for the entire run of the program. Its type is <code>&amp;'static str</code>: the lifetime <code>'static</code> means "valid for the whole program." A <code>&amp;'static str</code> satisfies any lifetime a <code>Report</code> could need, so <code>Report::new("total", total)</code> is a <code>Report&lt;'static&gt;</code> and never dangles.</p>
   <div class="note">
     <span class="label">'static, briefly</span>
-    <code>'static</code> is the longest possible lifetime: data that lives from the point it exists until the program ends. String literals are the everyday example. It is a real lifetime like any other, just the maximal one — not a keyword you sprinkle on to silence errors. (You will meet the <em>trait</em> bound <code>T: 'static</code> later, under threads and async; it is related but distinct.)
+    <code>'static</code> is the longest possible lifetime: data that lives from the point it exists until the program ends. String literals are the everyday example. It is a real lifetime like any other, just the maximal one. It is not a keyword you sprinkle on to silence errors. (You will meet the <em>trait</em> bound <code>T: 'static</code> later, under threads and async; it is related but distinct.)
   </div>
-  <p>Now pin the new type with a test. It mirrors the doc-test you wrote on the struct — build a <code>Report</code>, then assert on its accessors and its formatted line.</p>
-  <p><strong>Your turn</strong> — add this to the <code>#[cfg(test)] mod tests</code> block:</p>
+  <p>Now pin the new type with a test. It mirrors the doc-test you wrote on the struct: build a <code>Report</code>, then assert on its accessors and its formatted line.</p>
+  <p><strong>Your turn.</strong> Add this to the <code>#[cfg(test)] mod tests</code> block:</p>
   <pre><code>    #[test]
 <span class="add">    fn report_borrows_label_and_holds_counts() {</span>
 <span class="add">        let counts = Counts::from_text("a b c\n");</span>
@@ -255,7 +255,7 @@ test result: ok. 11 passed; 0 failed; 0 ignored; ...
 
 running 12 tests
 test result: ok. 12 passed; 0 failed; 0 ignored; ...</code></pre>
-  <p>And run it — the output is byte-for-byte what Lesson 8 produced, because <code>Report::line</code> formats the same row; only <em>where</em> the formatting lives has changed:</p>
+  <p>And run it. The output is byte-for-byte what Lesson 8 produced, because <code>Report::line</code> formats the same row; only <em>where</em> the formatting lives has changed:</p>
   <pre class="shell"><code>printf 'a b c\n' &gt; demo.txt
 printf 'café\nrésumé\n' &gt; unicode.txt
 cargo run -- demo.txt unicode.txt</code></pre>
@@ -265,24 +265,24 @@ cargo run -- demo.txt unicode.txt</code></pre>
 
   <div class="win">
     <span class="label">Outcome</span>
-    <code>rwc</code> now has its first type that borrows: a <code>Report&lt;'a&gt;</code> holding a borrowed label beside an owned <code>Counts</code>. You can read the <code>'a</code> annotation, you know the three elision rules that hide it in <code>name</code> and <code>first_chars</code>, and you know the one place it becomes mandatory — a struct that stores a reference. You saw the compiler reject a dangling borrow (<code>E0515</code>) and learned that <code>'static</code> is just the longest lifetime, the one a string literal carries.
+    <code>rwc</code> now has its first type that borrows: a <code>Report&lt;'a&gt;</code> holding a borrowed label beside an owned <code>Counts</code>. You can read the <code>'a</code> annotation, you know the three elision rules that hide it in <code>name</code> and <code>first_chars</code>, and you know the one place it becomes mandatory: a struct that stores a reference. You saw the compiler reject a dangling borrow (<code>E0515</code>) and learned that <code>'static</code> is just the longest lifetime, the one a string literal carries.
   </div>
 
   <h2>Optional extensions</h2>
   <ol>
-    <li><strong>Two-lifetime struct.</strong> Give <code>Report</code> a second borrowed field with its <em>own</em> lifetime — say a borrowed <code>note: &amp;'b str</code> — so the struct becomes <code>Report&lt;'a, 'b&gt;</code>. Notice you only need separate lifetimes if the two fields can be borrowed from different places for different durations; if they always come together, one lifetime is simpler.</li>
+    <li><strong>Two-lifetime struct.</strong> Give <code>Report</code> a second borrowed field with its <em>own</em> lifetime (say a borrowed <code>note: &amp;'b str</code>), so the struct becomes <code>Report&lt;'a, 'b&gt;</code>. Notice you only need separate lifetimes if the two fields can be borrowed from different places for different durations; if they always come together, one lifetime is simpler.</li>
     <li><strong>Elision, tested.</strong> Write out the explicit-lifetime signature of <code>Source::path_or_dash</code> and confirm it compiles the same as the elided form. Which of the three rules applies?</li>
-    <li><strong>Collect the reports.</strong> Build a <code>Vec&lt;Report&gt;</code> for all the sources and print them at the end instead of inside the loop. You will have to keep each label <code>String</code> alive (e.g. collect the labels into a <code>Vec&lt;String&gt;</code> first) so the borrows in the reports stay valid — a concrete lesson in why the borrow checker tracks lifetimes.</li>
+    <li><strong>Collect the reports.</strong> Build a <code>Vec&lt;Report&gt;</code> for all the sources and print them at the end instead of inside the loop. You will have to keep each label <code>String</code> alive (e.g. collect the labels into a <code>Vec&lt;String&gt;</code> first) so the borrows in the reports stay valid, a concrete lesson in why the borrow checker tracks lifetimes.</li>
   </ol>
 
   <h2>Check your understanding</h2>
   <div class="quiz">
     <p class="quiz-q">Why does <code>struct Report { label: &amp;str }</code> fail to compile?</p>
     <button class="quiz-opt" data-correct>A struct that stores a reference must declare a lifetime: <code>struct Report&lt;'a&gt; { label: &amp;'a str }</code></button>
-    <button class="quiz-opt">You cannot store references in structs at all — use <code>String</code></button>
+    <button class="quiz-opt">You cannot store references in structs at all; use <code>String</code></button>
     <button class="quiz-opt">It compiles fine; the lifetime is elided like in functions</button>
-    <p class="quiz-fb ok" hidden>Right — the compiler needs a lifetime to guarantee the <code>Report</code> never outlives the text its <code>label</code> borrows, and elision only applies to function signatures, not struct definitions. The fix is <code>Report&lt;'a&gt;</code> with <code>label: &amp;'a str</code>.</p>
-    <p class="quiz-fb no" hidden>You <em>can</em> store references in structs — you just have to name the lifetime, because elision doesn't apply to struct definitions. The compiler needs <code>'a</code> to stop the <code>Report</code> from outliving its borrowed <code>label</code>.</p>
+    <p class="quiz-fb ok" hidden>Right. The compiler needs a lifetime to guarantee the <code>Report</code> never outlives the text its <code>label</code> borrows, and elision only applies to function signatures, not struct definitions. The fix is <code>Report&lt;'a&gt;</code> with <code>label: &amp;'a str</code>.</p>
+    <p class="quiz-fb no" hidden>You <em>can</em> store references in structs; you just have to name the lifetime, because elision doesn't apply to struct definitions. The compiler needs <code>'a</code> to stop the <code>Report</code> from outliving its borrowed <code>label</code>.</p>
   </div>
 
   <div class="quiz">
@@ -290,24 +290,24 @@ cargo run -- demo.txt unicode.txt</code></pre>
     <button class="quiz-opt" data-correct>The returned reference borrows from <code>a</code> or <code>b</code>, so it can't outlive either</button>
     <button class="quiz-opt">The two strings must be exactly the same length</button>
     <button class="quiz-opt">The function copies both strings so the result is independent</button>
-    <p class="quiz-fb ok" hidden>Right — <code>'a</code> ties both inputs and the output together: the result borrows from the inputs, so the caller must keep both alive for as long as it holds the returned slice. Elision can't infer this because it can't tell which input the output comes from.</p>
-    <p class="quiz-fb no" hidden>A lifetime says nothing about length or copying — <code>'a</code> relates the references: the output borrows from <code>a</code> or <code>b</code> and therefore can't outlive either. That relationship is what elision couldn't guess with two input references.</p>
+    <p class="quiz-fb ok" hidden>Right. <code>'a</code> ties both inputs and the output together: the result borrows from the inputs, so the caller must keep both alive for as long as it holds the returned slice. Elision can't infer this because it can't tell which input the output comes from.</p>
+    <p class="quiz-fb no" hidden>A lifetime says nothing about length or copying. <code>'a</code> relates the references: the output borrows from <code>a</code> or <code>b</code> and therefore can't outlive either. That relationship is what elision couldn't guess with two input references.</p>
   </div>
 
   <div class="quiz">
-    <p class="quiz-q"><code>Report::new("total", total)</code> — the label is the literal <code>"total"</code>. What is its lifetime?</p>
-    <button class="quiz-opt" data-correct><code>'static</code> — string literals live in the binary for the whole program</button>
+    <p class="quiz-q">In <code>Report::new("total", total)</code>, the label is the literal <code>"total"</code>. What is its lifetime?</p>
+    <button class="quiz-opt" data-correct><code>'static</code>: string literals live in the binary for the whole program</button>
     <button class="quiz-opt">It is dropped at the end of the statement, so this shouldn't compile</button>
     <button class="quiz-opt">It has no lifetime because it isn't stored in a variable</button>
-    <p class="quiz-fb ok" hidden>Right — a string literal is <code>&amp;'static str</code>: baked into the binary, valid for the entire run. That satisfies any lifetime a <code>Report</code> could require, so this never dangles.</p>
-    <p class="quiz-fb no" hidden>String literals aren't temporaries — they live in the compiled binary for the whole program, so their type is <code>&amp;'static str</code>. Every reference has a lifetime, literal or not; this one is the maximal <code>'static</code>.</p>
+    <p class="quiz-fb ok" hidden>Right. A string literal is <code>&amp;'static str</code>: baked into the binary, valid for the entire run. That satisfies any lifetime a <code>Report</code> could require, so this never dangles.</p>
+    <p class="quiz-fb no" hidden>String literals aren't temporaries; they live in the compiled binary for the whole program, so their type is <code>&amp;'static str</code>. Every reference has a lifetime, literal or not; this one is the maximal <code>'static</code>.</p>
   </div>
 
   <h2>Primary sources</h2>
   <p>The canonical treatment is <a href="https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html"><strong>The Rust Book, Ch. 10.3 — "Validating References with Lifetimes"</strong></a>, which develops the <code>longest</code> example, lifetimes in structs, the elision rules, and <code>'static</code>. The precise elision algorithm lives in <a href="https://doc.rust-lang.org/reference/lifetime-elision.html"><strong>the Reference — "Lifetime elision."</strong></a> For the error codes, <code>rustc --explain E0106</code> and <code>--explain E0515</code> give worked explanations.</p>
 
   <div class="ask">
-    <strong>Questions are welcome.</strong> If a lifetime error stumps you, paste the whole message — <code>E0106</code> tells you exactly where a lifetime is missing and often suggests the fix, and <code>E0515</code> names the local you're accidentally borrowing from. Next: <strong>Lesson 10 turns to Cargo, crates &amp; dependencies</strong> — adding a real dependency, semver, the lockfile, and reproducible builds.
+    <strong>Questions are welcome.</strong> If a lifetime error stumps you, paste the whole message: <code>E0106</code> tells you exactly where a lifetime is missing and often suggests the fix, and <code>E0515</code> names the local you're accidentally borrowing from. Next: <strong>Lesson 10 turns to Cargo, crates &amp; dependencies</strong>, covering a real dependency, semver, the lockfile, and reproducible builds.
   </div>
 
   <div class="lesson-foot">
