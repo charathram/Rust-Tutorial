@@ -1,0 +1,270 @@
+<meta charset="utf-8">
+<title>Lesson 12 — Ergonomic errors: anyhow &amp; thiserror</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/quiz.js" defer></script>
+<script src="../assets/linenumbers.js" defer></script>
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/nav.js" defer></script>
+
+<div class="wrap">
+  <p class="eyebrow">Rust · Lesson 12 · Build-along</p>
+  <h1>Ergonomic errors: anyhow &amp; thiserror</h1>
+  <p class="subtitle">Back in Lesson 2 you returned <code>Box&lt;dyn Error&gt;</code> from <code>main</code> and, in Lesson 11, added a file's name to a read failure by hand: <code>.map_err(|e| format!("could not read {}: {}", …))</code>. That works, but it <em>flattens</em> the error: it glues the context and the cause into one string and throws the original error away. This lesson replaces that with the two crates most real Rust programs reach for: <a href="https://crates.io/crates/thiserror"><code>thiserror</code></a> to give the library a proper typed error, and <a href="https://crates.io/crates/anyhow"><code>anyhow</code></a> to carry context-rich errors through the binary. The anchoring feature: each failure says <em>which</em> file and why, as a real error chain, and you never have to format the strings yourself.</p>
+
+  <h2>Lesson goals</h2>
+  <p>By the end of this lesson you will be able to:</p>
+  <ul>
+    <li>Explain the division of labour: <code>thiserror</code> for a library's own <em>typed, matchable</em> error; <code>anyhow</code> for an application's <em>dynamic, context-carrying</em> error.</li>
+    <li>Define an error <code>enum</code> with <code>#[derive(thiserror::Error)]</code>, an <code>#[error("…")]</code> message per variant, and <code>#[from]</code> to convert an underlying error automatically.</li>
+    <li>Return <code>anyhow::Result&lt;()&gt;</code> from <code>main</code> and attach context with <code>.context(…)</code> / <code>.with_context(|| …)</code>.</li>
+    <li>Read the resulting error <em>chain</em> (a top-level message plus its <code>Caused by:</code> source) and say why it beats a flattened string.</li>
+    <li>Contrast all of this with the <code>Box&lt;dyn Error&gt;</code> approach from Lesson 2: what each buys and costs.</li>
+  </ul>
+
+  <div class="note">
+    <span class="label">Starting point</span>
+    Work in <code>0012-rwc/</code>, a clean copy of your finished Lesson 11 tool: <code>clap</code> flags, <code>Columns</code>, <code>Report&lt;'a&gt;</code>, <code>Source</code>, tests green (13 unit + 11 doc-tests). Run <code>cargo test</code> first to confirm it builds. As before, lines <span class="add-swatch">highlighted in green</span> are the ones to add or change, and code left as <code class="todo">// TODO (your turn)</code> is yours to write. Attempt it, then open <em>Show solution</em> to check.
+  </div>
+
+  <h2>Two crates, two jobs</h2>
+  <p>Rust's standard library gives you the <code>Error</code> trait and <code>?</code>, but nothing for the two things applications actually need: a concise way to <em>define</em> error types, and a way to <em>add context</em> as an error travels up. Two crates by the same author fill those gaps, and the split matches the shape <code>rwc</code> already has: a library (<code>lib.rs</code>) and a binary (<code>main.rs</code>):</p>
+  <ul>
+    <li><strong><code>thiserror</code> goes in the library.</strong> It derives the <code>Error</code> trait for an <code>enum</code> you define, so <code>rwc</code>'s own failures (a bad argument, a failed read) become a real type, <code>RwcError</code>, that a caller can <code>match</code> on. You write the variants; the macro writes the boilerplate.</li>
+    <li><strong><code>anyhow</code> goes in the binary.</strong> Its <code>anyhow::Error</code> is a smarter <code>Box&lt;dyn Error&gt;</code>: it holds <em>any</em> error, but also lets you staple a human message onto it with <code>.context()</code> while keeping the original as the <em>cause</em>. <code>main</code> doesn't care what concrete error came back; it just wants to add "which file" and report cleanly.</li>
+  </ul>
+  <p>The rule of thumb the ecosystem settled on: <strong>libraries return <code>thiserror</code> types</strong> (callers may need to tell failures apart), <strong>applications use <code>anyhow</code></strong> (they mostly add context and print). <code>rwc</code> is both, so it uses both.</p>
+
+  <div class="note">
+    <span class="label">Spaced review — vs. <code>Box&lt;dyn Error&gt;</code> (Lesson 2)</span>
+    <code>Box&lt;dyn Error&gt;</code> was the catch-all that let <code>?</code> unify many error kinds into one return type. <code>anyhow::Error</code> does the same job and adds two things it lacked: a <code>.context()</code> chain, and a captured backtrace. And where <code>Box&lt;dyn Error&gt;</code> is <em>opaque</em> (you can't tell what went wrong without downcasting), a <code>thiserror</code> enum is <em>transparent</em> to callers: they can <code>match</code> on the variant. Rough map: <code>Box&lt;dyn Error&gt;</code> ≈ a bare <code>anyhow::Error</code> with no context; a hand-written <code>enum</code> ≈ what <code>thiserror</code> generates for you.
+  </div>
+
+  <h2>Step 1 — Add the two crates</h2>
+  <p>Both are on crates.io; add them together. Neither needs a non-default feature (unlike clap's <code>derive</code> in Lesson 11):</p>
+  <pre class="shell"><code>cargo add anyhow thiserror</code></pre>
+  <pre class="shell"><code>      Adding anyhow v1.0.103 to dependencies
+      Adding thiserror v2.0.18 to dependencies</code></pre>
+  <p><code>cargo add</code> inserts both into <code>[dependencies]</code>, alphabetically, each as a plain version string:</p>
+  <pre><code>[dependencies]
+<span class="add">anyhow = "1.0.103"</span>
+clap = { version = "4.6.1", features = ["derive"] }
+<span class="add">thiserror = "2.0.18"</span>
+unicode-segmentation = "1.13.3"</code></pre>
+  <p>Notice the dependency <em>footprint</em>. Lesson 11's <code>clap</code> pulled in 20-odd crates; these two barely move the needle. The lockfile goes from 23 packages to <strong>26</strong>, just three more:</p>
+  <pre class="shell"><code>cargo tree -p anyhow -p thiserror</code></pre>
+  <pre class="shell"><code>anyhow v1.0.103
+
+thiserror v2.0.18
+└── thiserror-impl v2.0.18 (proc-macro)
+    ├── proc-macro2 v1.0.106
+    ├── quote v1.0.46
+    └── syn v2.0.118</code></pre>
+  <p><code>anyhow</code> has <em>zero</em> dependencies. <code>thiserror</code> brings one, its macro crate <code>thiserror-impl</code>, and that macro's own tools (<code>syn</code>, <code>quote</code>, <code>proc-macro2</code>) were already in your tree, pulled in by <code>clap_derive</code> back in Lesson 11. Cargo shares one copy across the whole graph, so they cost nothing extra here. Cheap, focused crates: the opposite end of the spectrum from clap.</p>
+
+  <h2>Step 2 — A typed library error with <code>thiserror</code></h2>
+  <p>Right now the library is dishonest about its errors. <code>Source::from_args</code> returns <code>Result&lt;…, Box&lt;dyn Error&gt;&gt;</code> and builds the error with <code>format!("invalid argument: {flag}").into()</code>, a <em>stringly-typed</em> error a caller can read but never inspect. And <code>Source::read</code> returns <code>io::Result</code>. Give the library one honest error type instead. Open <code>lib.rs</code> and, at the top, bring in the derive macro:</p>
+  <pre><code>use std::fs;
+use std::io::{self, Read};
+<span class="add">use thiserror::Error;</span>
+use unicode_segmentation::UnicodeSegmentation;</code></pre>
+  <p>Now define the error <code>enum</code>. Each variant is one way the library can fail; the <code>#[error("…")]</code> attribute is that variant's <code>Display</code> text (the message a user sees), and the macro writes the <code>Error</code> and <code>Display</code> impls for you. Two attributes are new and worth naming before you use them:</p>
+  <ul>
+    <li><code>#[from]</code> on a field asks the macro to generate a <code>From</code> impl, so the <code>?</code> operator will convert that underlying error into this variant automatically. That is the same conversion <code>Box&lt;dyn Error&gt;</code> got for free, but now into <em>your</em> type.</li>
+    <li><code>#[error(transparent)]</code> says "don't add a message of my own; forward <code>Display</code> and the source straight through to the wrapped error." Use it for a variant that only re-packages another error, like an I/O failure.</li>
+  </ul>
+  <p>Here is the first variant, worked; the second is yours:</p>
+  <pre><code><span class="c">// src/lib.rs — add near the top, below the imports</span>
+<span class="add">/// Everything that can go wrong inside the `rwc` library.</span>
+<span class="add">#[derive(Debug, Error)]</span>
+<span class="add">pub enum RwcError {</span>
+<span class="add">    /// An argument began with `-` but was neither `-` nor a valid flag.</span>
+<span class="add">    #[error("invalid argument: {0}")]</span>
+<span class="add">    InvalidArgument(String),</span>
+<span class="add"></span>
+<span class="add">    <span class="todo">// TODO (your turn): add an `Io` variant that wraps a `std::io::Error`.</span></span>
+<span class="add">    <span class="todo">// Use `#[error(transparent)]` and `#[from] io::Error`.</span></span>
+<span class="add">}</span></code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>    /// Reading a source failed; the wrapped `io::Error` says why.
+    #[error(transparent)]
+    Io(#[from] io::Error),</code></pre>
+  </details>
+  <p>The <code>{0}</code> in <code>#[error("invalid argument: {0}")]</code> interpolates the variant's first (and only) field, exactly like <code>format!</code>. So <code>RwcError::InvalidArgument("-x".into()).to_string()</code> is <code>"invalid argument: -x"</code>, and you get <code>Display</code> without writing an <code>impl</code>.</p>
+
+  <h3>Rewire <code>from_args</code></h3>
+  <p>Swap the stringly error for the typed one. The signature changes from <code>Box&lt;dyn std::error::Error&gt;</code> to <code>RwcError</code>, and the error arm constructs a variant instead of a formatted string. The two <code>Ok</code> arms are unchanged:</p>
+  <pre><code><span class="add">    pub fn from_args(args: Vec&lt;String&gt;) -&gt; Result&lt;Vec&lt;Source&gt;, RwcError&gt; {</span>
+        if args.is_empty() {
+            return Ok(vec![Source::Stdin]);
+        }
+        args.into_iter()
+            .map(|arg| match arg.as_str() {
+                "-" =&gt; Ok(Source::Stdin),
+<span class="add">                flag if flag.starts_with('-') =&gt; <span class="todo">/* TODO (your turn): Err(...) */</span>,</span>
+                _ =&gt; Ok(Source::File(arg)),
+            })
+            .collect()
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>                flag if flag.starts_with('-') =&gt; Err(RwcError::InvalidArgument(flag.to_string())),</code></pre>
+  </details>
+  <p>The <code>.collect()</code> still works: collecting an iterator of <code>Result&lt;Source, RwcError&gt;</code> into a <code>Result&lt;Vec&lt;Source&gt;, RwcError&gt;</code> stops at the first <code>Err</code>. The error type just went from a box to a named enum.</p>
+
+  <h3>Rewire <code>read</code></h3>
+  <p>Now <code>read</code> returns the library's error type too. Because <code>RwcError</code> has an <code>Io(#[from] io::Error)</code> variant, the <code>?</code> on each I/O call converts the <code>io::Error</code> into an <code>RwcError</code> for free. The <code>Stdin</code> arm is worked; do the <code>File</code> arm:</p>
+  <pre><code><span class="add">    pub fn read(&amp;self) -&gt; Result&lt;String, RwcError&gt; {</span>
+        match self {
+<span class="add">            Source::File(path) =&gt; <span class="todo">/* TODO (your turn): read the file, `?`, wrap in Ok */</span>,</span>
+            Source::Stdin =&gt; {
+                let mut buffer = String::new();
+<span class="add">                io::stdin().read_to_string(&amp;mut buffer)?;</span>
+                Ok(buffer)
+            }
+        }
+    }</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>            Source::File(path) =&gt; Ok(fs::read_to_string(path)?),</code></pre>
+  </details>
+  <p>One doc-test on <code>read</code> named the old error type in its hidden return line. Update it so the <code>?</code> has something to convert into:</p>
+  <pre><code>    /// ```no_run
+    /// use rwc::Source;
+    /// let text = Source::Stdin.read()?;
+    /// println!("{} bytes", text.len());
+<span class="add">    /// # Ok::&lt;(), rwc::RwcError&gt;(())</span>
+    /// ```</code></pre>
+
+  <h2>Step 3 — Context-rich errors in <code>main</code> with <code>anyhow</code></h2>
+  <p>The library now hands back a precise <code>RwcError</code>. The binary's job is different: propagate whatever comes, add the one piece of context the user needs (<em>which</em> source), and report. That is exactly the job <code>anyhow</code> was built for. Change the imports at the top of <code>main.rs</code>: bring in <code>anyhow</code>'s <code>Result</code> and its <code>Context</code> trait, and drop the now-unused <code>std::error::Error</code>:</p>
+  <pre><code><span class="add">use anyhow::{Context, Result};</span>
+use clap::Parser;
+use rwc::{Columns, Counts, Report, Source};</code></pre>
+  <p>Then the signature and the read. <code>anyhow::Result&lt;()&gt;</code> is just an alias for <code>Result&lt;(), anyhow::Error&gt;</code>. The <code>?</code> on <code>Source::from_args</code> now works because <code>RwcError</code> implements <code>Error</code> (thiserror derived it), and <code>anyhow::Error</code> can absorb any such type. On the read, replace the hand-rolled <code>.map_err(|e| format!(…))</code> with <code>.with_context(…)</code>:</p>
+  <pre><code><span class="add">fn main() -&gt; Result&lt;()&gt; {</span>
+    let cli = Cli::parse();
+    let cols = Columns::from_flags(cli.lines, cli.words, cli.bytes, cli.chars, cli.graphemes);
+    let sources = Source::from_args(cli.paths)?;
+
+    let mut total = Counts::default();
+    for source in &amp;sources {
+        let text = source
+            .read()
+<span class="add">            <span class="todo">// TODO (your turn): add context "could not read &lt;name&gt;", then `?`</span></span>
+        let counts = Counts::from_text(&amp;text);
+        <span class="c">// ... unchanged: build report, print, total.add(counts) ...</span>
+    }
+    <span class="c">// ... unchanged: total line when sources.len() &gt; 1 ...</span>
+    Ok(())
+}</code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>            .with_context(|| format!("could not read {}", source.name()))?;</code></pre>
+  </details>
+  <p>Two forms exist: <code>.context("message")</code> takes a value, and <code>.with_context(|| …)</code> takes a closure that runs <em>only</em> if there is an error. Use the closure form when building the message costs something, like the <code>format!</code> here. Either way, <code>anyhow</code> keeps the original error as the <em>source</em> and stacks your message on top. That is the whole difference from Lesson 11's <code>map_err</code>: <code>format!("… {}: {}", name, e)</code> destroyed the <code>io::Error</code> to make a string; <code>with_context</code> preserves it.</p>
+
+  <h3>Prove the message with a test</h3>
+  <p>Add one unit test that pins <code>RwcError</code>'s <code>Display</code> output. It documents the <code>#[error]</code> string and fails loudly if anyone changes it. You have the message from Step 2 (<code>"invalid argument: -x"</code>):</p>
+  <pre><code>    #[test]
+<span class="add">    fn invalid_argument_error_message() {</span>
+<span class="add">        let err = RwcError::InvalidArgument("-x".to_string());</span>
+<span class="add">        <span class="todo">// TODO (your turn): assert the Display text is "invalid argument: -x"</span></span>
+<span class="add">    }</span></code></pre>
+  <details class="solution">
+    <summary>Show solution</summary>
+    <pre><code>        assert_eq!(err.to_string(), "invalid argument: -x");</code></pre>
+  </details>
+
+  <h2>Step 4 — Read the error chain</h2>
+  <p>Tests first. The one new unit test brings the suite to <strong>14</strong>; the doc-tests stay at <strong>11</strong>:</p>
+  <pre class="shell"><code>cargo test</code></pre>
+  <pre class="shell"><code>running 14 tests
+test tests::invalid_argument_error_message ... ok
+... (the Lesson 11 tests) ...
+test result: ok. 14 passed; 0 failed; 0 ignored; ...
+
+   Doc-tests rwc
+running 11 tests
+test result: ok. 11 passed; 0 failed; 0 ignored; ...</code></pre>
+  <p>A normal run is unchanged; errors only show up when something fails:</p>
+  <pre class="shell"><code>printf 'a b c\n' &gt; demo.txt
+cargo run -q -- demo.txt</code></pre>
+  <pre class="shell"><code>     1      3      6      6      6 demo.txt</code></pre>
+  <p>Now ask for a file that isn't there. Because <code>main</code> returns an <code>anyhow::Result</code>, Rust prints the returned error with its full chain (your context on top, the underlying cause beneath) on <em>stderr</em>, and exits non-zero:</p>
+  <pre class="shell"><code>cargo run -q -- demo.txt missing.txt</code></pre>
+  <pre class="shell"><code>     1      3      6      6      6 demo.txt
+Error: could not read missing.txt
+
+Caused by:
+    No such file or directory (os error 2)</code></pre>
+  <p>Compare that with what Lesson 11 printed for the same failure, the flattened, quote-wrapped string a <code>Box&lt;dyn Error&gt;</code> built from <code>format!</code> produces:</p>
+  <pre class="shell"><code><span class="c"># Lesson 11 (before):</span>
+Error: "could not read missing.txt: No such file or directory (os error 2)"
+
+<span class="c"># Lesson 12 (after):</span>
+Error: could not read missing.txt
+
+Caused by:
+    No such file or directory (os error 2)</code></pre>
+  <p>Same information, but the chain is <em>structured</em>: the context and the cause are separate lines, and the real <code>io::Error</code> is still in there (a program could inspect it), not melted into text. The invalid-argument path shows your <code>thiserror</code> message directly. clap parses flags first, so you reach it by forcing an argument through with <code>--</code>:</p>
+  <pre class="shell"><code>cargo run -q -- -- -x</code></pre>
+  <pre class="shell"><code>Error: invalid argument: -x</code></pre>
+
+  <div class="win">
+    <span class="label">Outcome</span>
+    <code>rwc</code> now handles errors the way real Rust programs do. The library returns a typed <code>RwcError</code> built with <code>thiserror</code> (an <code>#[error]</code> message per variant, <code>#[from]</code> for automatic <code>io::Error</code> conversion), so callers get a concrete, matchable type instead of a stringly-typed box. The binary returns <code>anyhow::Result</code> and stacks per-file context with <code>.with_context()</code>, producing a real <em>error chain</em> (which file, then why) instead of a flattened string, while preserving the underlying cause. You also saw that focused crates like these cost almost nothing: three packages, versus clap's twenty.
+  </div>
+
+  <h2>Optional extensions</h2>
+  <ol>
+    <li><strong>See the whole chain inline.</strong> anyhow's <code>Display</code> shows only the top message; its <code>Debug</code> (what <code>main</code> prints) shows the chain. Try <code>eprintln!("{e:#}")</code> on an error somewhere; the <code>#</code> "alternate" flag prints the chain on one line, <code>context: cause</code>. Compare the three forms.</li>
+    <li><strong>Add a variant.</strong> Give <code>RwcError</code> an <code>Empty</code> variant (<code>#[error("no input given")]</code>) and return it from a new check. Because it is a real enum, a caller could <code>match</code> on <code>RwcError::Empty</code>, which <code>Box&lt;dyn Error&gt;</code> could never offer.</li>
+    <li><strong>Turn on backtraces.</strong> Run <code>RUST_BACKTRACE=1 cargo run -q -- missing.txt</code>. anyhow captures a backtrace at the point the error is created; the env var makes it print. Note when it helps (a deep call stack) and when it is noise (a one-line failure like this).</li>
+    <li><strong>Where would <code>anyhow</code> be wrong?</strong> If <code>rwc</code> were a library other crates depended on, returning <code>anyhow::Error</code> from its public functions would force <em>their</em> errors to be opaque too. Explain in a sentence why public library APIs should return <code>thiserror</code> types, not <code>anyhow</code>.</li>
+  </ol>
+
+  <h2>Check your understanding</h2>
+  <div class="quiz">
+    <p class="quiz-q">Why does <code>rwc</code> use <code>thiserror</code> in <code>lib.rs</code> but <code>anyhow</code> in <code>main.rs</code>?</p>
+    <button class="quiz-opt" data-correct>The library exposes a typed error callers can <code>match</code> on (<code>thiserror</code>); the binary just propagates, adds context, and reports, so a dynamic <code>anyhow::Error</code> fits</button>
+    <button class="quiz-opt">They are interchangeable; using both is only a style convention with no real difference</button>
+    <button class="quiz-opt"><code>anyhow</code> can't be used in a library and <code>thiserror</code> can't be used in a binary; the compiler enforces it</button>
+    <p class="quiz-fb ok" hidden>Right. A library should hand back a concrete, inspectable type (its callers may need to tell failures apart), which is what <code>thiserror</code> generates. An application mostly propagates and reports, so <code>anyhow</code>'s dynamic, context-carrying error is the ergonomic choice.</p>
+    <p class="quiz-fb no" hidden>The split is about who consumes the error. Libraries return typed <code>thiserror</code> enums so callers can <code>match</code>; binaries use <code>anyhow</code> to add context and print. Neither restriction is compiler-enforced; it's a deliberate design rule.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">What does <code>.with_context(|| format!("could not read {}", source.name()))</code> do that Lesson 11's <code>.map_err(|e| format!("… {}: {}", name, e))</code> did not?</p>
+    <button class="quiz-opt" data-correct>It attaches the message while keeping the original error as the <em>cause</em>, so both print as a chain (<code>Caused by:</code>) and the underlying error is still inspectable</button>
+    <button class="quiz-opt">It runs faster because closures are always faster than <code>format!</code></button>
+    <button class="quiz-opt">Nothing; the output is identical, it's just shorter to type</button>
+    <p class="quiz-fb ok" hidden>Right. <code>map_err</code> with <code>format!</code> flattened the context and the cause into one string, discarding the <code>io::Error</code>. <code>with_context</code> stacks the message on top and preserves the source, so you get a structured chain and can still reach the real error.</p>
+    <p class="quiz-fb no" hidden>The point isn't speed or brevity. The old <code>map_err(format!)</code> destroyed the underlying <code>io::Error</code> to make a flat string; <code>with_context</code> keeps it as the cause, giving a real error chain.</p>
+  </div>
+
+  <div class="quiz">
+    <p class="quiz-q">In <code>Io(#[from] io::Error)</code>, what does the <code>#[from]</code> attribute generate?</p>
+    <button class="quiz-opt" data-correct>A <code>From&lt;io::Error&gt;</code> impl for <code>RwcError</code>, so <code>?</code> converts an <code>io::Error</code> into <code>RwcError::Io</code> automatically</button>
+    <button class="quiz-opt">A conversion <em>from</em> <code>RwcError</code> <em>into</em> <code>io::Error</code>, for interop with the standard library</button>
+    <button class="quiz-opt">A <code>Default</code> value for the variant so it can be constructed with no arguments</button>
+    <p class="quiz-fb ok" hidden>Right. <code>#[from]</code> asks thiserror to write <code>impl From&lt;io::Error&gt; for RwcError</code>. That's what lets <code>fs::read_to_string(path)?</code> turn an I/O failure into <code>RwcError::Io</code> with no manual mapping.</p>
+    <p class="quiz-fb no" hidden>It generates <code>From&lt;io::Error&gt; for RwcError</code>, which is the direction the <code>?</code> operator needs to lift an <code>io::Error</code> into your error type. It has nothing to do with <code>Default</code> or converting back to <code>io::Error</code>.</p>
+  </div>
+
+  <h2>Primary sources</h2>
+  <p>The two crates' docs are short and worth reading in full: the <a href="https://docs.rs/anyhow/latest/anyhow/"><strong><code>anyhow</code> documentation</strong></a> (see the <code>Context</code> trait and the "details" section on the error chain) and the <a href="https://docs.rs/thiserror/latest/thiserror/"><strong><code>thiserror</code> documentation</strong></a> (every attribute: <code>#[error]</code>, <code>#[from]</code>, <code>#[source]</code>, <code>transparent</code>). For the underlying model both build on, read <a href="https://doc.rust-lang.org/book/ch09-00-error-handling.html"><strong>The Rust Book, Chapter 9 — "Error Handling."</strong></a> The design rule of thumb (<code>thiserror</code> for libraries, <code>anyhow</code> for applications) is stated directly in both crates' READMEs by their author.</p>
+
+  <div class="ask">
+    <strong>Questions are welcome.</strong> If <code>?</code> refuses to compile with a "trait <code>From</code> is not implemented" error, that's the conversion missing: check that the variant has <code>#[from]</code> and the function returns the right error type. That closes Module 3, and <code>rwc</code> is now a polished, flag-driven tool that fails cleanly. Next, <strong>Module 4, Lesson 13 — Collections: <code>Vec</code> &amp; <code>HashMap</code></strong>, where a second tool, <code>wordfreq</code>, starts tallying word frequencies.
+  </div>
+
+  <div class="lesson-foot">
+    <div class="nav-links">
+      <a href="../reference/glossary.html">📖 Glossary</a>
+      <a href="./0011-clap-flags.html">◂ Lesson 11: Flags with clap</a>
+      <a href="https://docs.rs/anyhow/latest/anyhow/">📘 anyhow docs</a>
+      <span>Next ▸ Lesson 13: Vec &amp; HashMap</span>
+    </div>
+  </div>
+</div>

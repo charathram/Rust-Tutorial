@@ -22,7 +22,8 @@
     { n: '8', title: 'Strings &amp; slices', file: '0008-strings-and-slices.html' },
     { n: '9', title: 'Lifetimes',        file: '0009-lifetimes.html' },
     { n: '10', title: 'Cargo &amp; dependencies', file: '0010-cargo-dependencies.html' },
-    { n: '11', title: 'Flags with clap', file: '0011-clap-flags.html' }
+    { n: '11', title: 'Flags with clap', file: '0011-clap-flags.html' },
+    { n: '12', title: 'Ergonomic errors', file: '0012-anyhow-thiserror.html' }
   ];
   var REFS = [
     { title: 'Glossary', href: '../reference/glossary.html' }

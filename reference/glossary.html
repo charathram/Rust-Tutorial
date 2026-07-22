@@ -24,6 +24,10 @@
       <dd>Postfix on a <code>Result</code> (or <code>Option</code>): unwraps <code>Ok(v)</code> to <code>v</code>, or returns <code>Err(e)</code> early from the enclosing function. Requires that function to return a compatible <code>Result</code>/<code>Option</code>. <span class="seen">Lesson 2</span></dd>
     </div>
     <div class="term">
+      <dt>anyhow <span class="seen">(Lesson 12)</span></dt>
+      <dd>A crate for <em>application</em> error handling. Its <code>anyhow::Error</code> is a smarter <code>Box&lt;dyn Error&gt;</code>: it wraps any value implementing the <code>Error</code> trait, but also carries a chain of <em>context</em> messages and a captured backtrace. <code>anyhow::Result&lt;T&gt;</code> (an alias for <code>Result&lt;T, anyhow::Error&gt;</code>) is the usual return type for <code>main</code> and helper functions, and the <code>Context</code> trait adds <code>.context(msg)</code> / <code>.with_context(|| msg)</code> to attach a human-facing message while keeping the original error as the cause. Use it in binaries; prefer a typed <em>thiserror</em> error for a library's public API.</dd>
+    </div>
+    <div class="term">
       <dt><code>assert_eq!</code> / <code>assert!</code></dt>
       <dd>Test macros: <code>assert_eq!(a, b)</code> panics (failing the test) unless the values are equal, printing both on failure; <code>assert!(cond, "msg")</code> panics unless <code>cond</code> is true. <span class="seen">Lesson 3</span></dd>
     </div>
@@ -86,6 +90,10 @@
     <div class="term">
       <dt>enum <span class="seen">(Lesson 6)</span></dt>
       <dd>A custom type that is exactly <em>one of</em> a fixed set of <em>variants</em> (a "sum type" / tagged union), and a variant may carry data — e.g. <code>Source::Stdin</code> or <code>Source::File(String)</code>. The compiler tracks which variant is active; you read it back with <code>match</code>. <code>Option</code> and <code>Result</code> are standard-library enums.</dd>
+    </div>
+    <div class="term">
+      <dt>Error context / source chain <span class="seen">(Lesson 12)</span></dt>
+      <dd>An error's <em>source chain</em> is the sequence from a top-level failure down to its root cause, each error linked to the next through the <code>Error::source</code> method. <em>Adding context</em> means wrapping an error with a higher-level message (e.g. <code>anyhow</code>'s <code>.with_context()</code>) so the message sits on top and the original error stays reachable as its source. Printed, the chain reads as the message, then <code>Caused by:</code> and the underlying error — <code>could not read missing.txt</code> caused by <code>No such file or directory</code>. Contrast with flattening both into one <code>format!</code> string, which throws the underlying error away.</dd>
     </div>
     <div class="term">
       <dt>Exhaustiveness <span class="seen">(Lesson 7)</span></dt>
@@ -190,6 +198,10 @@
     <div class="term">
       <dt>struct <span class="seen">(Lesson 6)</span></dt>
       <dd>A custom type bundling named fields held <em>together</em> (a "product type") — e.g. <code>Counts { lines, words, bytes, chars }</code>. Fields and the type carry <code>pub</code> visibility independently; methods and associated functions live in an <code>impl</code> block. The named fields replace positional tuple access (<code>.0</code>/<code>.1</code>).</dd>
+    </div>
+    <div class="term">
+      <dt>thiserror <span class="seen">(Lesson 12)</span></dt>
+      <dd>A crate for defining a <em>library's</em> own error type. <code>#[derive(thiserror::Error)]</code> on an <code>enum</code> (or struct) generates the <code>Error</code> and <code>Display</code> impls from attributes: <code>#[error("…")]</code> sets a variant's message, with <code>{0}</code>/<code>{field}</code> interpolation; <code>#[from]</code> generates a <code>From</code> impl so <code>?</code> converts an underlying error automatically; and <code>#[error(transparent)]</code> forwards <code>Display</code> and the source straight to a wrapped error. The result is a concrete, matchable type — what a library should return, versus <em>anyhow</em> for applications.</dd>
     </div>
     <div class="term">
       <dt>Trait <span class="seen">(seen: Orientation, Lessons 2 &amp; 6 — full treatment Module 4)</span></dt>
